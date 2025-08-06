@@ -2,6 +2,7 @@ import os
 import cv2
 import face_recognition
 import numpy as np
+from collections import deque
 from datetime import datetime
 
 DATASET_DIR = "dataset"
@@ -38,25 +39,29 @@ def alert_known(name):
     print("\a", end="")  # attempt to beep
 
 
-def save_unknown(frame, video_capture):
-    """Save the current frame and a short video clip for an unknown face."""
+def save_unknown(frames, video_capture, fps, frame_size):
+    """Save buffered frames and additional footage for an unknown face."""
     os.makedirs(UNKNOWN_IMAGE_DIR, exist_ok=True)
     os.makedirs(UNKNOWN_VIDEO_DIR, exist_ok=True)
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     image_path = os.path.join(UNKNOWN_IMAGE_DIR, f"unknown_{ts}.jpg")
-    cv2.imwrite(image_path, frame)
+    cv2.imwrite(image_path, frames[-1])
 
-    fps = int(video_capture.get(cv2.CAP_PROP_FPS)) or 30
-    width = int(video_capture.get(cv2.CAP_PROP_FRAME_WIDTH))
-    height = int(video_capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
     video_path = os.path.join(UNKNOWN_VIDEO_DIR, f"unknown_{ts}.mp4")
-    writer = cv2.VideoWriter(video_path, fourcc, fps, (width, height))
+    writer = cv2.VideoWriter(video_path, fourcc, fps, frame_size)
+
+    # Write pre-trigger frames from the buffer
+    for buf_frame in frames:
+        writer.write(buf_frame)
+
+    # Record additional frames after trigger
     for _ in range(int(fps * VIDEO_CLIP_SECONDS)):
         ret, clip_frame = video_capture.read()
         if not ret:
             break
         writer.write(clip_frame)
+
     writer.release()
     print(f"Unknown person recorded: {image_path}, {video_path}")
 
@@ -71,12 +76,23 @@ def recognize():
         print("Cannot open camera.")
         return
 
+    # Prepare video properties and buffering
+    fps = int(video_capture.get(cv2.CAP_PROP_FPS)) or 30
+    width = int(video_capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(video_capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    frame_size = (width, height)
+    frame_buffer = deque(maxlen=int(fps * VIDEO_CLIP_SECONDS))
+
     try:
         last_unknown_time = datetime.min
         while True:
             ret, frame = video_capture.read()
             if not ret:
                 break
+
+            # Maintain a rolling buffer of recent frames
+            frame_buffer.append(frame.copy())
+
             small = cv2.resize(frame, (0, 0), fx=0.25, fy=0.25)
             rgb_small = small[:, :, ::-1]
 
@@ -101,7 +117,7 @@ def recognize():
             if unknown_present:
                 now = datetime.now()
                 if (now - last_unknown_time).total_seconds() > UNKNOWN_SAVE_COOLDOWN:
-                    save_unknown(frame, video_capture)
+                    save_unknown(list(frame_buffer), video_capture, fps, frame_size)
                     last_unknown_time = now
 
             if cv2.waitKey(1) & 0xFF == ord('q'):
