@@ -37,7 +37,7 @@ sudo apt install -y \
   build-essential cmake libopenblas-dev liblapack-dev libjpeg-dev libtiff5-dev \
   libpng-dev libavcodec-dev libavformat-dev libswscale-dev libv4l-dev \
   libxvidcore-dev libx264-dev libatlas-base-dev libgtk2.0-dev pkg-config \
-  libhdf5-dev python3-venv libcamera-utils
+  libhdf5-dev python3-venv libcamera-apps
 ```
 
 ### 3. 编译并安装 dlib（同时启用 NEON 指令集与 OpenMP 并行）
@@ -50,9 +50,9 @@ cd dlib
 mkdir build && cd build
 cmake .. \
   -DDLIB_USE_CUDA=OFF \
-  -DDLIB_USE_OPENMP=ON \
   -DCMAKE_BUILD_TYPE=RELEASE \
-  -DCMAKE_CXX_FLAGS="-march=armv8-a+simd -O3"
+  -DCMAKE_CXX_FLAGS="-march=armv8-a+simd -O3 -fopenmp" \
+  -DCMAKE_EXE_LINKER_FLAGS="-fopenmp"
 make -j4
 sudo make install
 cd ../..
