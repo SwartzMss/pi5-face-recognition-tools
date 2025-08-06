@@ -17,8 +17,9 @@ def capture_faces(num_photos: int = 3) -> None:
     num_photos: int, optional
         Number of photos to capture per person. Defaults to 3.
     """
-    cap = cv2.VideoCapture(CAMERA_INDEX)
-    print(f"Trying to open camera at index {CAMERA_INDEX}")
+    # 使用V4L2后端
+    cap = cv2.VideoCapture(CAMERA_INDEX, cv2.CAP_V4L2)
+    print(f"Trying to open camera at index {CAMERA_INDEX} with V4L2 backend")
     if not cap.isOpened():
         print("Cannot open camera.")
         return

@@ -28,7 +28,8 @@ def open_available_camera(preferred_index=CAMERA_INDEX, max_index=MAX_CAMERA_IND
     indices.extend(i for i in range(max_index) if i != preferred_index)
 
     for idx in indices:
-        cap = cv2.VideoCapture(idx)
+        # 使用V4L2后端
+        cap = cv2.VideoCapture(idx, cv2.CAP_V4L2)
         if cap.isOpened():
             if idx != preferred_index:
                 print(f"Using camera index {idx}")
