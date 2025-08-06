@@ -94,7 +94,7 @@ pip install \
 python recognize.py
 ```
 
-- 若检测到未在库中的陌生人，会将当前帧保存至 `unknown_images/` 并录制数秒短视频到 `unknown_videos/`。
+- 若检测到未在库中的陌生人，会将当前帧保存至 `unknown_images/` 并录制数秒短视频到 `unknown_videos/`。为避免重复保存，脚本设置了 `UNKNOWN_SAVE_COOLDOWN`（默认 10 秒）作为冷却时间。
 - 若识别到已知人员，会在终端提示并触发蜂鸣，不保存视频。
 
 ---

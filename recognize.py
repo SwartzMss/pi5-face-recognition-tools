@@ -8,6 +8,8 @@ DATASET_DIR = "dataset"
 UNKNOWN_IMAGE_DIR = "unknown_images"
 UNKNOWN_VIDEO_DIR = "unknown_videos"
 VIDEO_CLIP_SECONDS = 3
+# Cooldown between unknown recordings to avoid duplicates
+UNKNOWN_SAVE_COOLDOWN = 10
 TOLERANCE = 0.5
 CAMERA_INDEX = 0
 
@@ -70,6 +72,7 @@ def recognize():
         return
 
     try:
+        last_unknown_time = datetime.min
         while True:
             ret, frame = video_capture.read()
             if not ret:
@@ -80,6 +83,7 @@ def recognize():
             locations = face_recognition.face_locations(rgb_small)
             encodings = face_recognition.face_encodings(rgb_small, locations)
 
+            unknown_present = False
             for face_encoding in encodings:
                 matches = face_recognition.compare_faces(known_encodings, face_encoding, TOLERANCE)
                 name = "Unknown"
@@ -90,9 +94,15 @@ def recognize():
                         name = known_names[best_index]
 
                 if name == "Unknown":
-                    save_unknown(frame, video_capture)
+                    unknown_present = True
                 else:
                     alert_known(name)
+
+            if unknown_present:
+                now = datetime.now()
+                if (now - last_unknown_time).total_seconds() > UNKNOWN_SAVE_COOLDOWN:
+                    save_unknown(frame, video_capture)
+                    last_unknown_time = now
 
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
