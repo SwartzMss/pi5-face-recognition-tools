@@ -121,7 +121,9 @@ def recognize():
         return
 
     # Prepare video properties and buffering
-    fps = int(video_capture.get(cv2.CAP_PROP_FPS)) or 30
+    fps = int(video_capture.get(cv2.CAP_PROP_FPS))
+    if fps <= 0:
+        fps = 30  # 如果无法获取FPS，使用默认值30
     width = int(video_capture.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(video_capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
     frame_size = (width, height)
