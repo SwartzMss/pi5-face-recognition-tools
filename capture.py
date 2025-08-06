@@ -108,16 +108,30 @@ def capture_faces(num_photos: int = 3) -> None:
                 while count < num_photos:
                     input(f"拍摄第 {count + 1}/{num_photos} 张照片 - 按回车键拍摄...")
                     
+                    # 拍照前停止预览
+                    print("正在拍摄...")
+                    if preview_process:
+                        preview_process.terminate()
+                        preview_process.wait()
+                    
                     count += 1
                     idx = len(existing) + count
                     file_path = os.path.join(person_dir, f"{idx}.jpg")
                     
-                    print("拍摄中...")
+                    # 拍照
                     if capture_with_rpicam(file_path):
                         print(f"✓ 已保存 {file_path}")
                     else:
                         print("✗ 拍摄失败，请重试")
                         count -= 1  # 重试这张照片
+                    
+                    # 如果还有照片要拍，重新启动预览
+                    if count < num_photos:
+                        print("重新启动预览...")
+                        preview_process = subprocess.Popen(preview_cmd, 
+                                                         stdout=subprocess.DEVNULL, 
+                                                         stderr=subprocess.DEVNULL)
+                        time.sleep(1)  # 等待预览启动
                         
             except KeyboardInterrupt:
                 print(f"\n{name} 拍摄结束")
