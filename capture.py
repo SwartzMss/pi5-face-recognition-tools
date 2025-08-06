@@ -17,9 +17,25 @@ def capture_faces(num_photos: int = 3) -> None:
     num_photos: int, optional
         Number of photos to capture per person. Defaults to 3.
     """
-    # 使用V4L2后端
-    cap = cv2.VideoCapture(CAMERA_INDEX, cv2.CAP_V4L2)
-    print(f"Trying to open camera at index {CAMERA_INDEX} with V4L2 backend")
+    # 尝试多种后端
+    cap = None
+    backends = [
+        (cv2.CAP_V4L2, "V4L2"),
+        (cv2.CAP_GSTREAMER, "GStreamer"),
+        (cv2.CAP_ANY, "Auto")
+    ]
+    
+    for backend, name in backends:
+        print(f"Trying {name} backend...")
+        cap = cv2.VideoCapture(CAMERA_INDEX, backend)
+        if cap.isOpened():
+            print(f"Successfully opened camera with {name} backend")
+            break
+        cap.release()
+    
+    if cap is None or not cap.isOpened():
+        print("Cannot open camera with any backend.")
+        return
     if not cap.isOpened():
         print("Cannot open camera.")
         return
