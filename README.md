@@ -1,12 +1,12 @@
 # Pi5 人脸识别工具
 
-一套在 Raspberry Pi 5 上进行人脸检测与识别的工具和示例结构说明。本仓库提供：环境搭建指南、性能优化思路，以及后续添加的采集、训练、识别脚本占位目录。
+在 Raspberry Pi 5 上进行人脸检测与识别的工具和示例结构说明。本仓库提供：环境搭建指南、性能优化思路，以及后续添加的采集、训练、识别脚本占位目录。
 
 ---
 
 ## 📋 项目概述
 
-`pi5-face-recognition-tools` 旨在利用 Raspberry Pi 5 的 CPU 指令集优化及可选外部加速器，实现实时人脸检测与识别。虽然示例脚本（如 `capture.py`、`train.py`、`recognize.py`）将于后续版本添加，本 README 主要覆盖：
+`pi5-face-recognition-tools` 旨在利用 Raspberry Pi 5 的 CPU 指令集优化，实现实时人脸检测与识别。虽然示例脚本（如 `capture.py`、`train.py`、`recognize.py`）将于后续版本添加，本 README 主要覆盖：
 
 - 系统与 Python 环境准备
 
@@ -35,7 +35,7 @@
 - **操作系统**\*\*
 
   - Raspberry Pi OS（64 位，Bullseye 或更新版本）
-  - 若使用 CSI 摄像头，请在 `/boot/firmware/config.txt` 中启用 `libcamera` 及对应 `dtoverlay`
+  - 使用 CSI 摄像头，请在 `/boot/firmware/config.txt` 中启用 `libcamera` 及对应 `dtoverlay`
 
 ---
 
