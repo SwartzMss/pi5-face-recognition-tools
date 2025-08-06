@@ -2,7 +2,7 @@ import os
 import cv2
 
 DATASET_DIR = "dataset"
-CAMERA_INDEX = 0
+CAMERA_INDEX = 1  # 尝试使用 video1
 
 def capture_faces(num_photos: int = 3) -> None:
     """Capture face images for a given person.
@@ -23,6 +23,17 @@ def capture_faces(num_photos: int = 3) -> None:
         print("Cannot open camera.")
         return
     print("Camera opened successfully!")
+    
+    # 等待摄像头初始化
+    import time
+    time.sleep(2)
+    print("Camera initialization completed.")
+    
+    # 设置摄像头参数
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+    cap.set(cv2.CAP_PROP_FPS, 30)
+    print("Camera parameters set.")
 
     try:
         while True:
