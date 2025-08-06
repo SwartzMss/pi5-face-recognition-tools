@@ -2,7 +2,7 @@ import os
 import cv2
 
 DATASET_DIR = "dataset"
-CAMERA_INDEX = 1  # 尝试使用 video1
+CAMERA_INDEX = 0  # 使用 video0
 
 def capture_faces(num_photos: int = 3) -> None:
     """Capture face images for a given person.
