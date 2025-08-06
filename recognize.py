@@ -57,6 +57,11 @@ class RPiCameraStream:
                     frame = cv2.imread(self.temp_image)
                     if frame is not None:
                         self.latest_frame = frame.copy()
+                        print(f"捕获帧: {frame.shape}")  # 调试信息
+                    else:
+                        print("警告: 无法读取图像文件")
+                else:
+                    print(f"rpicam-still 失败: {result.returncode}")
                 
                 time.sleep(self.frame_interval)
                 
@@ -341,14 +346,29 @@ def recognize():
                     save_unknown(list(frame_buffer), video_capture, fps, frame_size)
                     last_unknown_time = now  # 更新上次记录时间
 
-            # 在帧上添加状态信息
-            status_text = f"FPS: {frame_count / (current_time - start_time):.1f} | Faces: {len(face_names)}"
-            cv2.putText(frame, status_text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-            cv2.putText(frame, "Press 'q' to quit", (10, height - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+            # 调试信息
+            if frame is not None:
+                print(f"Frame shape: {frame.shape}, dtype: {frame.dtype}")
+                
+                # 在帧上添加状态信息
+                status_text = f"FPS: {frame_count / (current_time - start_time):.1f} | Faces: {len(face_names)}"
+                cv2.putText(frame, status_text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+                cv2.putText(frame, "Press 'q' to quit", (10, height - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
 
-            cv2.imshow("Face Recognition - Pi5", frame)  # 显示识别结果
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                break  # 按 q 键退出
+                # 尝试显示窗口
+                try:
+                    cv2.imshow("Face Recognition - Pi5", frame)
+                    key = cv2.waitKey(1) & 0xFF
+                    if key == ord('q'):
+                        break  # 按 q 键退出
+                except Exception as e:
+                    print(f"GUI display error: {e}")
+                    print("继续无GUI模式运行...")
+                    # 无GUI模式，只在终端显示识别结果
+                    if face_names:
+                        print(f"检测到人脸: {', '.join(face_names)}")
+            else:
+                print("警告: 获取到空帧")
     except KeyboardInterrupt:
         print("Interrupted by user.")
     finally:
