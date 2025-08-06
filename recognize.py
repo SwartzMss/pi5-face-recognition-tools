@@ -131,9 +131,11 @@ def recognize():
 
     last_unknown_time = datetime.min
     try:
+        print("Starting face recognition loop...")
         while True:
             ret, frame = video_capture.read()
             if not ret:
+                print("Failed to read frame from camera. Exiting.")
                 break
 
             # Maintain a rolling buffer of recent frames
