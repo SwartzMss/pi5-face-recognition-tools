@@ -100,19 +100,24 @@ def recognize():
             encodings = face_recognition.face_encodings(rgb_small, locations)
 
             unknown_present = False
-            for face_encoding in encodings:
-                matches = face_recognition.compare_faces(known_encodings, face_encoding, TOLERANCE)
-                name = "Unknown"
+            if encodings:
+                encodings_array = np.array(encodings)
                 if known_encodings:
-                    distances = face_recognition.face_distance(known_encodings, face_encoding)
-                    best_index = np.argmin(distances)
-                    if matches and matches[best_index]:
-                        name = known_names[best_index]
-
-                if name == "Unknown":
-                    unknown_present = True
+                    known_array = np.array(known_encodings)
+                    distance_matrix = np.linalg.norm(
+                        known_array[:, None, :] - encodings_array[None, :, :], axis=2
+                    )
+                    best_match_indices = np.argmin(distance_matrix, axis=0)
+                    best_match_distances = distance_matrix[
+                        best_match_indices, np.arange(len(encodings))
+                    ]
+                    for i, distance in enumerate(best_match_distances):
+                        if distance <= TOLERANCE:
+                            alert_known(known_names[best_match_indices[i]])
+                        else:
+                            unknown_present = True
                 else:
-                    alert_known(name)
+                    unknown_present = True
 
             if unknown_present:
                 now = datetime.now()
