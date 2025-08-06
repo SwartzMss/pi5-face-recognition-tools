@@ -21,26 +21,35 @@
    sudo apt update && sudo apt upgrade
    ```
 
-2. 启用摄像头：
+2. 启用摄像头并配置 overlay：
 
    ```bash
    sudo raspi-config  # Interface Options -> Camera -> Enable
+   # 如使用 CSI 摄像头 3，请在 /boot/firmware/config.txt 中确认已添加
+   # dtoverlay=imx477（或相应的摄像头 overlay）。
    ```
 
 3. 安装基础构建工具与依赖：
 
    ```bash
    sudo apt install -y git cmake build-essential python3-dev python3-pip \
-       libopenblas-dev liblapack-dev
+       libopenblas-dev liblapack-dev python3-opencv libcamera-apps
    ```
 
-4. 安装人脸识别库：
+4. 创建并激活 Python 虚拟环境：
 
    ```bash
-   pip install dlib face_recognition
+   python3 -m venv venv
+   source venv/bin/activate
    ```
 
-5. 测试摄像头是否工作：
+5. 安装人脸识别库及常见图像处理依赖：
+
+   ```bash
+   pip install dlib face_recognition numpy opencv-python
+   ```
+
+6. 测试摄像头是否工作：
 
    ```bash
    libcamera-still -o test.jpg
