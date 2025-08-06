@@ -6,7 +6,7 @@
 
 ## 📋 项目概述
 
-`pi5-face-recognition-tools` 旨在利用 Raspberry Pi 5 的 CPU 指令集优化，实现实时人脸检测与识别。虽然示例脚本（如 `capture.py`、`train.py`、`recognize.py`）将于后续版本添加，本 README 主要覆盖：
+`pi5-face-recognition-tools` 旨在利用 Raspberry Pi 5 的 CPU 指令集优化，实现实时人脸检测与识别。仓库已包含一个基础的 `recognize.py` 实时识别脚本，后续将补充 `capture.py`、`train.py` 等，README 主要覆盖：
 
 - 系统与 Python 环境准备
 
@@ -100,6 +100,19 @@ pip install \
 - **OpenMP 并行**：确保 `dlib` 编译时启用 OpenMP，可用所有 CPU 核心。
 - **BLAS 加速**：`libopenblas-dev` 提供更快的线性代数运算。
 - **异步流水线**：使用多线程分离采集、检测、识别。
+
+---
+
+## 🧪 示例脚本：实时识别
+
+在 `dataset/` 目录中放置已知人员的照片（文件名作为姓名），然后运行：
+
+```bash
+python recognize.py
+```
+
+- 若检测到未在库中的陌生人，会将当前帧保存至 `unknown_images/` 并录制数秒短视频到 `unknown_videos/`。
+- 若识别到已知人员，会在终端提示并触发蜂鸣，不保存视频。
 
 ---
 
