@@ -1,5 +1,6 @@
 import os
 import subprocess
+import time
 
 # 数据集目录
 DATASET_DIR = "dataset"
@@ -54,40 +55,14 @@ def capture_with_rpicam(output_path: str) -> bool:
         return False
 
 
-def preview_camera() -> None:
-    """
-    预览摄像头效果，帮助调整位置和光线
-    """
-    print("启动摄像头预览 (按 Ctrl+C 结束预览)")
-    try:
-        cmd = [
-            "rpicam-hello",
-            "--timeout", "0",        # 持续预览
-            "--width", "640",
-            "--height", "480",
-            "--brightness", "0.3",   # 与拍摄参数一致
-            "--contrast", "1.2",
-            "--saturation", "1.0",
-            "--awb", "tungsten",
-            "--ev", "0.5"
-        ]
-        subprocess.run(cmd)
-    except KeyboardInterrupt:
-        print("\n预览结束")
-    except Exception as e:
-        print(f"预览失败: {e}")
-
 
 def capture_faces(num_photos: int = 3) -> None:
     """
     使用 rpicam-still 命令进行人脸图像捕获 (树莓派5)
+    带实时预览，按回车拍照
     """
     print("使用 rpicam-still 进行图像捕获")
-    
-    # 询问是否需要预览
-    preview_choice = input("是否要先预览摄像头效果? (y/n) [y]: ").strip().lower()
-    if preview_choice != 'n':  # 默认开启预览
-        preview_camera()
+    print("预览窗口将持续显示，在终端按回车键拍照")
     
     try:
         while True:
@@ -103,20 +78,55 @@ def capture_faces(num_photos: int = 3) -> None:
                 if f.lower().endswith((".jpg", ".jpeg", ".png"))
             ]
             
-            count = 0
-            while count < num_photos:
-                input(f"准备拍摄第 {count + 1}/{num_photos} 张照片，按回车键拍摄...")
+            # 启动持续预览
+            print(f"正在为 {name} 启动摄像头预览...")
+            print("在终端按回车键拍照，按 Ctrl+C 结束当前人员拍摄")
+            
+            preview_process = None
+            try:
+                # 启动预览进程（后台运行）
+                preview_cmd = [
+                    "rpicam-hello",
+                    "--timeout", "0",        # 持续预览
+                    "--width", "640",
+                    "--height", "480", 
+                    "--brightness", "0.3",
+                    "--contrast", "1.2",
+                    "--saturation", "1.0",
+                    "--awb", "tungsten",
+                    "--ev", "0.5"
+                ]
+                preview_process = subprocess.Popen(preview_cmd, 
+                                                 stdout=subprocess.DEVNULL, 
+                                                 stderr=subprocess.DEVNULL)
                 
-                count += 1
-                idx = len(existing) + count
-                file_path = os.path.join(person_dir, f"{idx}.jpg")
+                # 等待预览启动
+                time.sleep(2)
+                print("预览已启动，现在可以开始拍照了！")
                 
-                print("正在拍摄...")
-                if capture_with_rpicam(file_path):
-                    print(f"✓ 已保存 {file_path}")
-                else:
-                    print("✗ 拍摄失败，请重试")
-                    count -= 1  # 重试这张照片
+                count = 0
+                while count < num_photos:
+                    input(f"拍摄第 {count + 1}/{num_photos} 张照片 - 按回车键拍摄...")
+                    
+                    count += 1
+                    idx = len(existing) + count
+                    file_path = os.path.join(person_dir, f"{idx}.jpg")
+                    
+                    print("拍摄中...")
+                    if capture_with_rpicam(file_path):
+                        print(f"✓ 已保存 {file_path}")
+                    else:
+                        print("✗ 拍摄失败，请重试")
+                        count -= 1  # 重试这张照片
+                        
+            except KeyboardInterrupt:
+                print(f"\n{name} 拍摄结束")
+            finally:
+                # 结束预览进程
+                if preview_process:
+                    preview_process.terminate()
+                    preview_process.wait()
+                    print("预览已关闭")
                     
             cont = input("是否继续添加其他人? (y/n): ").strip().lower()
             if cont != 'y':
