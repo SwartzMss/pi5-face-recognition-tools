@@ -20,6 +20,8 @@ def load_known_faces(dataset_dir):
 
     从数据集目录中加载带标签的人脸编码。`dataset_dir` 下应该为每个人
     创建一个子目录，目录名作为标签，目录中可以包含多张该人的照片。
+    如果某张图片中检测到多张人脸，将会跳过并给出警告，以避免错误
+    的标签影响识别准确率。
     """
     encodings = []
     names = []
@@ -33,9 +35,13 @@ def load_known_faces(dataset_dir):
             file_path = os.path.join(person_dir, file_name)
             image = face_recognition.load_image_file(file_path)
             face_encs = face_recognition.face_encodings(image)
-            if face_encs:
+            if len(face_encs) == 1:
                 encodings.append(face_encs[0])  # 只使用检测到的第一张人脸
                 names.append(person_name)  # 目录名作为标签
+            elif len(face_encs) > 1:
+                print(
+                    f"Warning: Multiple faces detected in {file_path}. Skipping this image."
+                )
     return encodings, names
 
 
