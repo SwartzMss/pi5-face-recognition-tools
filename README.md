@@ -22,23 +22,6 @@
 
 ---
 
-## 📦 前置条件
-
--
-
-  **依赖清单**：相机接口与图像处理库
-
-- **Shell 命令**：一步步搭建环境**硬件场景限制**
-
-  - 摄像头：仅支持 CSI 官方摄像头模块（如 Raspberry Pi Camera Module v3）
-
-- **操作系统**\*\*
-
-  - Raspberry Pi OS（64 位，Bullseye 或更新版本）
-  - 使用 CSI 摄像头，请在 `/boot/firmware/config.txt` 中启用 `libcamera` 及对应 `dtoverlay`
-
----
-
 ## 🔧 环境安装
 
 ### 1. 系统更新
