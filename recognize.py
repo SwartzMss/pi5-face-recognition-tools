@@ -13,6 +13,28 @@ VIDEO_CLIP_SECONDS = 3  # 每次录制视频的秒数
 UNKNOWN_SAVE_COOLDOWN = 10  # 保存未知人脸的冷却时间，避免重复记录
 TOLERANCE = 0.5  # 人脸识别的距离阈值
 CAMERA_INDEX = 0  # 摄像头索引
+MAX_CAMERA_INDEX = 10  # 尝试搜索摄像头的最大数量
+
+
+def open_available_camera(preferred_index=CAMERA_INDEX, max_index=MAX_CAMERA_INDEX):
+    """Try to open a camera, scanning indices if needed.
+
+    优先使用 `preferred_index`，若打开失败则从 0 开始依次尝试其它摄像头索引。
+    返回成功打开的 `cv2.VideoCapture` 对象，如未找到可用摄像头则返回 None。
+    """
+    indices = []
+    if preferred_index is not None:
+        indices.append(preferred_index)
+    indices.extend(i for i in range(max_index) if i != preferred_index)
+
+    for idx in indices:
+        cap = cv2.VideoCapture(idx)
+        if cap.isOpened():
+            if idx != preferred_index:
+                print(f"Using camera index {idx}")
+            return cap
+        cap.release()
+    return None
 
 
 def load_known_faces(dataset_dir):
@@ -93,8 +115,8 @@ def recognize():
     if not known_encodings:
         print("No known faces loaded. Populate the dataset directory with images.")
 
-    video_capture = cv2.VideoCapture(CAMERA_INDEX)
-    if not video_capture.isOpened():
+    video_capture = open_available_camera(CAMERA_INDEX)
+    if video_capture is None:
         print("Cannot open camera.")
         return
 
