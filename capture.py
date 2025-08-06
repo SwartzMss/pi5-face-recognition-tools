@@ -20,13 +20,20 @@ def capture_with_rpicam(output_path: str) -> bool:
         是否成功捕获图像
     """
     try:
-        # 使用rpicam-still捕获图像
+        # 使用rpicam-still捕获图像，优化参数
         cmd = [
             "rpicam-still", 
             "-o", output_path,
             "--width", "640",
             "--height", "480",
-            "--timeout", "1000"  # 1秒超时
+            "--timeout", "2000",     # 2秒超时
+            "--brightness", "0.3",   # 增加亮度
+            "--contrast", "1.2",     # 增强对比度
+            "--saturation", "1.0",   # 正常饱和度
+            "--awb", "tungsten",     # 钨丝灯白平衡，减少绿色调
+            "--ev", "0.5",           # 增加曝光补偿
+            "--quality", "95",       # 高质量JPEG
+            "--encoding", "jpg"
         ]
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
         
@@ -47,11 +54,40 @@ def capture_with_rpicam(output_path: str) -> bool:
         return False
 
 
+def preview_camera() -> None:
+    """
+    预览摄像头效果，帮助调整位置和光线
+    """
+    print("启动摄像头预览 (按 Ctrl+C 结束预览)")
+    try:
+        cmd = [
+            "rpicam-hello",
+            "--timeout", "0",        # 持续预览
+            "--width", "640",
+            "--height", "480",
+            "--brightness", "0.3",   # 与拍摄参数一致
+            "--contrast", "1.2",
+            "--saturation", "1.0",
+            "--awb", "tungsten",
+            "--ev", "0.5"
+        ]
+        subprocess.run(cmd)
+    except KeyboardInterrupt:
+        print("\n预览结束")
+    except Exception as e:
+        print(f"预览失败: {e}")
+
+
 def capture_faces(num_photos: int = 3) -> None:
     """
     使用 rpicam-still 命令进行人脸图像捕获 (树莓派5)
     """
     print("使用 rpicam-still 进行图像捕获")
+    
+    # 询问是否需要预览
+    preview_choice = input("是否要先预览摄像头效果? (y/n) [y]: ").strip().lower()
+    if preview_choice != 'n':  # 默认开启预览
+        preview_camera()
     
     try:
         while True:
