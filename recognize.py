@@ -4,6 +4,9 @@ import face_recognition
 import numpy as np
 from collections import deque
 from datetime import datetime
+import subprocess
+import threading
+import time
 
 DATASET_DIR = "dataset"  # 数据集目录
 UNKNOWN_IMAGE_DIR = "unknown_images"  # 未知人脸图像保存目录
@@ -16,26 +19,58 @@ CAMERA_INDEX = 0  # 摄像头索引
 MAX_CAMERA_INDEX = 10  # 尝试搜索摄像头的最大数量
 
 
-def open_available_camera(preferred_index=CAMERA_INDEX, max_index=MAX_CAMERA_INDEX):
-    """Try to open a camera, scanning indices if needed.
-
-    优先使用 `preferred_index`，若打开失败则从 0 开始依次尝试其它摄像头索引。
-    返回成功打开的 `cv2.VideoCapture` 对象，如未找到可用摄像头则返回 None。
+def open_camera_pi5():
+    """Open camera using libcamera for Pi5 compatibility.
+    
+    为树莓派5打开摄像头，优先使用libcamera，回退到V4L2
     """
-    indices = []
-    if preferred_index is not None:
-        indices.append(preferred_index)
-    indices.extend(i for i in range(max_index) if i != preferred_index)
-
-    for idx in indices:
-        # 使用V4L2后端
-        cap = cv2.VideoCapture(idx, cv2.CAP_V4L2)
+    # 先尝试 libcamera (Pi5 推荐)
+    print("Trying libcamera backend...")
+    try:
+        cap = cv2.VideoCapture(0, cv2.CAP_ANY)
         if cap.isOpened():
-            if idx != preferred_index:
-                print(f"Using camera index {idx}")
-            return cap
-        cap.release()
+            # 测试读取帧
+            ret, _ = cap.read()
+            if ret:
+                print("✓ Libcamera backend working")
+                # 设置参数
+                cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+                cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+                cap.set(cv2.CAP_PROP_FPS, 30)
+                return cap
+            else:
+                print("✗ Libcamera backend failed to read frames")
+                cap.release()
+    except Exception as e:
+        print(f"Libcamera attempt failed: {e}")
+    
+    # 回退到 V4L2
+    print("Trying V4L2 backend...")
+    for device in ["/dev/video0", "/dev/video1", "/dev/video2"]:
+        try:
+            cap = cv2.VideoCapture(device, cv2.CAP_V4L2)
+            if cap.isOpened():
+                ret, _ = cap.read()
+                if ret:
+                    print(f"✓ V4L2 backend working with {device}")
+                    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+                    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+                    cap.set(cv2.CAP_PROP_FPS, 30)
+                    return cap
+                cap.release()
+        except Exception as e:
+            print(f"V4L2 attempt with {device} failed: {e}")
+    
+    print("ERROR: 无法打开任何摄像头设备")
+    print("请检查:")
+    print("1. 摄像头是否正确连接")
+    print("2. 运行 'rpicam-hello' 测试摄像头是否工作")
     return None
+
+
+def open_available_camera(preferred_index=CAMERA_INDEX, max_index=MAX_CAMERA_INDEX):
+    """Wrapper function for backward compatibility."""
+    return open_camera_pi5()
 
 
 def load_known_faces(dataset_dir):
@@ -121,23 +156,61 @@ def recognize():
         print("Cannot open camera.")
         return
 
+    # 摄像头预热
+    print("Warming up camera...")
+    for i in range(10):
+        ret, _ = video_capture.read()
+        if ret:
+            break
+        time.sleep(0.1)
+    
     # Prepare video properties and buffering
     fps = int(video_capture.get(cv2.CAP_PROP_FPS))
-    if fps <= 0:
-        fps = 30  # 如果无法获取FPS，使用默认值30
+    if fps <= 0 or fps > 60:  # 添加FPS上限检查
+        fps = 30  # 如果无法获取FPS或FPS异常，使用默认值30
+        print(f"Using default FPS: {fps}")
+    else:
+        print(f"Camera FPS: {fps}")
+        
     width = int(video_capture.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(video_capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    print(f"Camera resolution: {width}x{height}")
+    
     frame_size = (width, height)
     frame_buffer = deque(maxlen=int(fps * VIDEO_CLIP_SECONDS))
 
     last_unknown_time = datetime.min
+    frame_read_failures = 0
+    max_failures = 5
+    
+    # 性能监控
+    frame_count = 0
+    start_time = time.time()
+    last_fps_time = start_time
+    
     try:
         print("Starting face recognition loop...")
+        print("Press 'q' to quit")
         while True:
             ret, frame = video_capture.read()
             if not ret:
-                print("Failed to read frame from camera. Exiting.")
-                break
+                frame_read_failures += 1
+                print(f"Failed to read frame from camera (attempt {frame_read_failures}/{max_failures})")
+                if frame_read_failures >= max_failures:
+                    print("Too many consecutive frame read failures. Exiting.")
+                    break
+                time.sleep(0.1)  # 短暂等待后重试
+                continue
+            
+            frame_read_failures = 0  # 成功读取后重置失败计数
+            frame_count += 1
+
+            # 每5秒显示一次FPS
+            current_time = time.time()
+            if current_time - last_fps_time >= 5.0:
+                actual_fps = frame_count / (current_time - start_time)
+                print(f"Processing FPS: {actual_fps:.1f}")
+                last_fps_time = current_time
 
             # Maintain a rolling buffer of recent frames
             frame_buffer.append(frame.copy())  # 保存最近的帧到缓冲区
@@ -175,20 +248,28 @@ def recognize():
 
             # Draw results on the frame
             for (top, right, bottom, left), name in zip(locations, face_names):
+                # 缩放回原始尺寸
                 top *= 4
                 right *= 4
                 bottom *= 4
                 left *= 4
-                cv2.rectangle(frame, (left, top), (right, bottom), (0, 255, 0), 2)  # 绘制人脸矩形框
+                
+                # 设置颜色：已知人员为绿色，未知人员为红色
+                color = (0, 255, 0) if name != "Unknown" else (0, 0, 255)
+                cv2.rectangle(frame, (left, top), (right, bottom), color, 2)
+                
+                # 添加标签背景
+                label_size = cv2.getTextSize(name, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)[0]
+                cv2.rectangle(frame, (left, top - 35), (left + label_size[0], top), color, -1)
                 cv2.putText(
                     frame,
                     name,
                     (left, top - 10),
                     cv2.FONT_HERSHEY_SIMPLEX,
-                    0.5,
-                    (0, 255, 0),
-                    1,
-                )  # 在图像上写入名称
+                    0.6,
+                    (255, 255, 255),
+                    2,
+                )
 
             if unknown_present:
                 now = datetime.now()
@@ -196,7 +277,12 @@ def recognize():
                     save_unknown(list(frame_buffer), video_capture, fps, frame_size)
                     last_unknown_time = now  # 更新上次记录时间
 
-            cv2.imshow("Video", frame)  # 显示识别结果
+            # 在帧上添加状态信息
+            status_text = f"FPS: {frame_count / (current_time - start_time):.1f} | Faces: {len(face_names)}"
+            cv2.putText(frame, status_text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+            cv2.putText(frame, "Press 'q' to quit", (10, height - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+
+            cv2.imshow("Face Recognition - Pi5", frame)  # 显示识别结果
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break  # 按 q 键退出
     except KeyboardInterrupt:
@@ -207,4 +293,17 @@ def recognize():
 
 
 if __name__ == "__main__":
+    import sys
+    
+    print("=== 树莓派5 人脸识别系统 ===")
+    print("确保已使用 capture.py 收集训练数据")
+    
+    # 检查是否有训练数据
+    if not os.path.exists(DATASET_DIR) or not os.listdir(DATASET_DIR):
+        print(f"警告: 未找到训练数据目录 '{DATASET_DIR}' 或目录为空")
+        print("请先运行 capture.py 收集人脸数据")
+        choice = input("是否继续运行? (y/n): ").strip().lower()
+        if choice != 'y':
+            sys.exit(0)
+    
     recognize()
