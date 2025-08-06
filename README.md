@@ -57,7 +57,8 @@ sudo apt install -y \
   libhdf5-dev python3-venv libcamera-utils
 ```
 
-### 3. 编译并安装 dlib（启用 NEON/OpenMP）
+### 3. 编译并安装 dlib（同时启用 NEON 指令集与 OpenMP 并行）
+- #### 说明：NEON 与 OpenMP 可以同时启用。NEON 提供 SIMD 向量化加速，而 OpenMP 利用多核并行，共同提升计算性能。
 
 ```bash
 # 克隆 dlib 源码
