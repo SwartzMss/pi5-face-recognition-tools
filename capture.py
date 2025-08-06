@@ -18,9 +18,11 @@ def capture_faces(num_photos: int = 3) -> None:
         Number of photos to capture per person. Defaults to 3.
     """
     cap = cv2.VideoCapture(CAMERA_INDEX)
+    print(f"Trying to open camera at index {CAMERA_INDEX}")
     if not cap.isOpened():
         print("Cannot open camera.")
         return
+    print("Camera opened successfully!")
 
     try:
         while True:
