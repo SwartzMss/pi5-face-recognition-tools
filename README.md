@@ -1,24 +1,33 @@
 # Pi5 人脸识别工具
 
-在 Raspberry Pi 5 上进行人脸检测与识别的工具和示例结构说明。本仓库提供：环境搭建指南、性能优化思路，以及后续添加的采集、训练、识别脚本占位目录。
+基于 Raspberry Pi 5 的实时人脸检测与识别系统，完全适配 Pi5 的 libcamera 摄像头系统。本仓库提供完整的解决方案：从数据采集到实时识别，专为树莓派5优化。
 
 ---
 
 ## 📋 项目概述
 
-`pi5-face-recognition-tools` 旨在利用 Raspberry Pi 5 的 CPU 指令集优化，实现实时人脸检测与识别。仓库已包含一个基础的 `recognize.py` 实时识别脚本，后续将补充 `capture.py`、`train.py` 等，README 主要覆盖：
+`pi5-face-recognition-tools` 专为 Raspberry Pi 5 设计，实现了完整的人脸识别工作流：
 
-- 系统与 Python 环境准备
+### 🎯 核心功能
+- **数据采集** (`capture.py`)：使用 rpicam-still 进行高质量人脸图像采集
+- **实时识别** (`recognize.py`)：基于 libcamera 的实时人脸检测与识别
+- **树莓派5优化**：完美适配 Pi5 的新摄像头架构
 
-- dlib 源码编译及 NEON/OpenMP 加速
-
-- 性能调优要点
+### ✨ 技术特性
+- **libcamera 支持**：原生支持树莓派5摄像头系统
+- **智能后端切换**：libcamera 优先，V4L2 备选
+- **实时预览**：拍照时提供持续预览功能
+- **性能监控**：实时 FPS 显示和处理统计
+- **资源管理**：解决摄像头设备占用冲突
 
 ---
 
-## ⚙️ 功能特性
+## ⚙️ 系统要求
 
-- **dlib 源码编译**：启用 ARM NEON 与 OpenMP 支持
+- **硬件**：Raspberry Pi 5
+- **摄像头**：CSI 摄像头或 USB 摄像头
+- **操作系统**：Raspberry Pi OS (64位推荐)
+- **Python**：3.8+
 
 ---
 
@@ -37,8 +46,10 @@ sudo apt install -y \
   build-essential cmake libopenblas-dev liblapack-dev libjpeg-dev libtiff5-dev \
   libpng-dev libavcodec-dev libavformat-dev libswscale-dev libv4l-dev \
   libxvidcore-dev libx264-dev libatlas-base-dev libgtk2.0-dev pkg-config \
-  libhdf5-dev python3-venv libcamera-apps
+  libhdf5-dev python3-venv libcamera-apps rpicam-apps
 ```
+
+**重要**：确保安装了 `rpicam-apps`，这是树莓派5摄像头的核心组件。
 
 ### 3. 编译并安装 dlib（同时启用 NEON 指令集与 OpenMP 并行）
 - #### 说明：NEON 与 OpenMP 可以同时启用。NEON 提供 SIMD 向量化加速，而 OpenMP 利用多核并行，共同提升计算性能。
@@ -88,39 +99,174 @@ pip install \
 
 ## 📸 数据采集
 
-使用 `capture.py` 可以通过摄像头为新的身份采集照片。运行脚本后，先输入
-姓名，然后在预览窗口中按 Enter 键保存当前帧（默认每人拍摄 3 张，按
-`q` 可以提前结束）。图像将自动保存到 `dataset/<姓名>/` 目录下。
+### 🎥 使用 capture.py 采集人脸数据
+
+`capture.py` 使用树莓派5的 `rpicam-still` 命令进行高质量图像采集，具有以下特性：
+
+- **实时预览**：持续显示摄像头预览窗口
+- **即拍即得**：在终端按回车键立即拍照
+- **自动管理**：预览进程自动启停，避免资源冲突
+- **优化参数**：针对Pi5调优的摄像头设置
+
+#### 使用方法：
 
 ```bash
 python capture.py
 ```
 
----
+#### 操作流程：
 
-## 🧪 示例脚本：实时识别
+1. **设置拍摄数量**：输入每人拍摄的照片数量（默认3张）
+2. **输入姓名**：为要采集的人员输入姓名
+3. **预览启动**：系统自动启动摄像头预览窗口
+4. **拍照操作**：在终端按回车键拍照，预览窗口显示实时画面
+5. **继续采集**：可以继续为其他人员采集数据
 
-在 `dataset/` 目录下为每个人创建一个子目录，目录名作为姓名标签，
-目录中可以放置多张该人员的照片，例如：
-
+#### 数据存储结构：
 ```
 dataset/
-├── Alice/
+├── 张三/
+│   ├── 1.jpg
+│   ├── 2.jpg
+│   └── 3.jpg
+├── 李四/
 │   ├── 1.jpg
 │   └── 2.jpg
-└── Bob/
-    ├── 1.jpg
-    └── 2.jpg
+└── ...
 ```
 
-准备好数据集后运行：
+---
+
+## 🧪 实时人脸识别
+
+### 🎯 使用 recognize.py 进行实时识别
+
+`recognize.py` 提供完整的实时人脸识别功能，专为树莓派5优化：
+
+#### ✨ 主要特性：
+
+- **智能摄像头**：libcamera 优先，V4L2 备选
+- **可视化界面**：绿框显示已知人员，红框显示未知人员
+- **性能监控**：实时显示 FPS 和检测到的人脸数量
+- **自动记录**：未知人员自动保存图片和视频
+- **稳定性**：错误重试和异常处理机制
+
+#### 使用方法：
 
 ```bash
 python recognize.py
 ```
 
-- 若检测到未在库中的陌生人，会将当前帧保存至 `unknown_images/` 并录制数秒短视频到 `unknown_videos/`。为避免重复保存，脚本设置了 `UNKNOWN_SAVE_COOLDOWN`（默认 10 秒）作为冷却时间。
-- 若识别到已知人员，会在终端提示并触发蜂鸣，不保存视频。
+#### 系统界面说明：
+
+- **绿色边框**：已识别的已知人员
+- **红色边框**：未识别的陌生人员
+- **状态信息**：显示实时FPS和检测人脸数量
+- **按 'q' 退出**：安全退出识别系统
+
+#### 自动记录功能：
+
+- **未知人脸图片**：保存到 `unknown_images/` 目录
+- **未知人脸视频**：保存到 `unknown_videos/` 目录  
+- **冷却机制**：10秒内避免重复记录同一未知人员
+- **文件命名**：使用时间戳确保文件唯一性
+
+#### 数据集要求：
+
+确保 `dataset/` 目录结构如下：
+```
+dataset/
+├── 张三/
+│   ├── 1.jpg
+│   ├── 2.jpg
+│   └── 3.jpg
+├── 李四/
+│   ├── 1.jpg
+│   └── 2.jpg
+└── ...
+```
+
+---
+
+## 🚀 快速开始
+
+### 完整使用流程：
+
+1. **环境准备**
+   ```bash
+   # 更新系统
+   sudo apt update && sudo apt upgrade -y
+   
+   # 安装依赖
+   sudo apt install -y rpicam-apps libcamera-apps
+   
+   # 测试摄像头
+   rpicam-hello --timeout 5000
+   ```
+
+2. **安装项目**
+   ```bash
+   git clone https://github.com/SwartzMss/pi5-face-recognition-tools.git
+   cd pi5-face-recognition-tools
+   
+   # 创建虚拟环境
+   python3 -m venv venv
+   source venv/bin/activate
+   
+   # 安装依赖
+   pip install face_recognition opencv-python numpy
+   ```
+
+3. **数据采集**
+   ```bash
+   python capture.py
+   # 为每个人员采集3-5张不同角度的照片
+   ```
+
+4. **开始识别**
+   ```bash
+   python recognize.py
+   # 系统将自动加载训练数据并开始实时识别
+   ```
+
+---
+
+## 🔧 故障排除
+
+### 摄像头相关问题：
+
+**问题：摄像头无法打开**
+```bash
+# 检查摄像头连接
+rpicam-hello --timeout 3000
+
+# 查看可用设备
+ls -la /dev/video*
+
+# 检查摄像头权限
+sudo usermod -a -G video $USER
+# 重新登录后生效
+```
+
+**问题：图像质量差或颜色异常**
+- capture.py 中已优化参数，适合大多数环境
+- 如需调整，可修改摄像头参数：亮度、对比度、白平衡等
+
+**问题：性能较慢**
+```bash
+# 确保启用所有CPU核心
+echo "检查CPU核心数："
+nproc
+
+# 监控系统资源
+htop
+```
+
+### 识别精度问题：
+
+- **采集更多样本**：每人至少3-5张不同角度、光线的照片
+- **提高图像质量**：确保人脸清晰、光线充足
+- **调整识别阈值**：在 recognize.py 中修改 `TOLERANCE` 值
 
 ---
 
