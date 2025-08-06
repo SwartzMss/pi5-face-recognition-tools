@@ -18,21 +18,24 @@ CAMERA_INDEX = 0  # 摄像头索引
 def load_known_faces(dataset_dir):
     """Load labeled face encodings from the dataset directory.
 
-    从数据集目录中加载带标签的人脸编码
+    从数据集目录中加载带标签的人脸编码。`dataset_dir` 下应该为每个人
+    创建一个子目录，目录名作为标签，目录中可以包含多张该人的照片。
     """
     encodings = []
     names = []
-    for file_name in os.listdir(dataset_dir):
-        file_path = os.path.join(dataset_dir, file_name)
-        if not os.path.isfile(file_path):
-            continue  # 跳过非文件，例如子目录
-        if not file_name.lower().endswith((".jpg", ".jpeg", ".png")):
-            continue  # 只处理常见的图像文件
-        image = face_recognition.load_image_file(file_path)
-        face_encs = face_recognition.face_encodings(image)
-        if face_encs:
-            encodings.append(face_encs[0])  # 只使用检测到的第一张人脸
-            names.append(os.path.splitext(file_name)[0])  # 文件名作为标签
+    for person_name in os.listdir(dataset_dir):
+        person_dir = os.path.join(dataset_dir, person_name)
+        if not os.path.isdir(person_dir):
+            continue  # 只处理子目录
+        for file_name in os.listdir(person_dir):
+            if not file_name.lower().endswith((".jpg", ".jpeg", ".png")):
+                continue  # 只处理常见的图像文件
+            file_path = os.path.join(person_dir, file_name)
+            image = face_recognition.load_image_file(file_path)
+            face_encs = face_recognition.face_encodings(image)
+            if face_encs:
+                encodings.append(face_encs[0])  # 只使用检测到的第一张人脸
+                names.append(person_name)  # 目录名作为标签
     return encodings, names
 
 
