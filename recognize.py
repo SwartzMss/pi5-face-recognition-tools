@@ -83,8 +83,8 @@ def recognize():
     frame_size = (width, height)
     frame_buffer = deque(maxlen=int(fps * VIDEO_CLIP_SECONDS))
 
+    last_unknown_time = datetime.min
     try:
-        last_unknown_time = datetime.min
         while True:
             ret, frame = video_capture.read()
             if not ret:
@@ -100,6 +100,7 @@ def recognize():
             encodings = face_recognition.face_encodings(rgb_small, locations)
 
             unknown_present = False
+            face_names = []
             if encodings:
                 encodings_array = np.array(encodings)
                 if known_encodings:
@@ -113,11 +114,32 @@ def recognize():
                     ]
                     for i, distance in enumerate(best_match_distances):
                         if distance <= TOLERANCE:
-                            alert_known(known_names[best_match_indices[i]])
+                            name = known_names[best_match_indices[i]]
+                            alert_known(name)
                         else:
+                            name = "Unknown"
                             unknown_present = True
+                        face_names.append(name)
                 else:
+                    face_names = ["Unknown"] * len(encodings)
                     unknown_present = True
+
+            # Draw results on the frame
+            for (top, right, bottom, left), name in zip(locations, face_names):
+                top *= 4
+                right *= 4
+                bottom *= 4
+                left *= 4
+                cv2.rectangle(frame, (left, top), (right, bottom), (0, 255, 0), 2)
+                cv2.putText(
+                    frame,
+                    name,
+                    (left, top - 10),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.5,
+                    (0, 255, 0),
+                    1,
+                )
 
             if unknown_present:
                 now = datetime.now()
@@ -125,8 +147,11 @@ def recognize():
                     save_unknown(list(frame_buffer), video_capture, fps, frame_size)
                     last_unknown_time = now
 
+            cv2.imshow("Video", frame)
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
+    except KeyboardInterrupt:
+        print("Interrupted by user.")
     finally:
         video_capture.release()
         cv2.destroyAllWindows()
