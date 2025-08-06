@@ -19,53 +19,122 @@ CAMERA_INDEX = 0  # 摄像头索引
 MAX_CAMERA_INDEX = 10  # 尝试搜索摄像头的最大数量
 
 
-def open_camera_pi5():
-    """Open camera using libcamera for Pi5 compatibility.
+class RPiCameraStream:
+    """使用 rpicam-still 定时捕获帧来模拟视频流"""
     
-    为树莓派5打开摄像头，优先使用libcamera，回退到V4L2
-    """
-    # 先尝试 libcamera (Pi5 推荐)
-    print("Trying libcamera backend...")
-    try:
-        cap = cv2.VideoCapture(0, cv2.CAP_ANY)
-        if cap.isOpened():
-            # 测试读取帧
-            ret, _ = cap.read()
-            if ret:
-                print("✓ Libcamera backend working")
-                # 设置参数
-                cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-                cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-                cap.set(cv2.CAP_PROP_FPS, 30)
-                return cap
-            else:
-                print("✗ Libcamera backend failed to read frames")
-                cap.release()
-    except Exception as e:
-        print(f"Libcamera attempt failed: {e}")
+    def __init__(self, width=640, height=480, fps=10):  # 降低FPS以适应rpicam-still
+        self.width = width
+        self.height = height
+        self.fps = fps
+        self.frame_interval = 1.0 / fps
+        self.running = False
+        self.latest_frame = None
+        self.temp_image = "/tmp/camera_frame.jpg"
+        self.capture_thread = None
+        
+    def capture_frames(self):
+        """在后台线程中持续捕获帧"""
+        while self.running:
+            try:
+                # 使用rpicam-still捕获单帧
+                cmd = [
+                    "rpicam-still",
+                    "-o", self.temp_image,
+                    "--width", str(self.width),
+                    "--height", str(self.height),
+                    "--timeout", "100",  # 快速捕获
+                    "--brightness", "0.3",
+                    "--contrast", "1.2",
+                    "--saturation", "1.0",
+                    "--awb", "tungsten",
+                    "--ev", "0.5"
+                ]
+                
+                result = subprocess.run(cmd, capture_output=True, timeout=2)
+                
+                if result.returncode == 0 and os.path.exists(self.temp_image):
+                    # 读取图像
+                    frame = cv2.imread(self.temp_image)
+                    if frame is not None:
+                        self.latest_frame = frame.copy()
+                
+                time.sleep(self.frame_interval)
+                
+            except Exception as e:
+                print(f"Frame capture error: {e}")
+                time.sleep(self.frame_interval)
+                
+    def start_stream(self):
+        """启动帧捕获"""
+        print("Starting rpicam-still frame capture...")
+        self.running = True
+        self.capture_thread = threading.Thread(target=self.capture_frames, daemon=True)
+        self.capture_thread.start()
+        
+        # 等待第一帧
+        for i in range(50):  # 最多等待5秒
+            if self.latest_frame is not None:
+                print("✓ RPiCamera frame capture started successfully")
+                return self
+            time.sleep(0.1)
+            
+        print("✗ Failed to capture initial frame")
+        self.stop_stream()
+        return None
     
-    # 回退到 V4L2
-    print("Trying V4L2 backend...")
-    for device in ["/dev/video0", "/dev/video1", "/dev/video2"]:
+    def read(self):
+        """读取最新帧，模拟OpenCV VideoCapture.read()"""
+        if self.latest_frame is not None:
+            return True, self.latest_frame.copy()
+        return False, None
+    
+    def isOpened(self):
+        """检查流是否打开"""
+        return self.running
+    
+    def release(self):
+        """停止并清理"""
+        self.stop_stream()
+    
+    def stop_stream(self):
+        """停止帧捕获"""
+        self.running = False
+        if self.capture_thread:
+            self.capture_thread.join(timeout=2)
+        
+        # 清理临时文件
         try:
-            cap = cv2.VideoCapture(device, cv2.CAP_V4L2)
-            if cap.isOpened():
-                ret, _ = cap.read()
-                if ret:
-                    print(f"✓ V4L2 backend working with {device}")
-                    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-                    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-                    cap.set(cv2.CAP_PROP_FPS, 30)
-                    return cap
-                cap.release()
-        except Exception as e:
-            print(f"V4L2 attempt with {device} failed: {e}")
+            os.remove(self.temp_image)
+        except:
+            pass
     
-    print("ERROR: 无法打开任何摄像头设备")
-    print("请检查:")
-    print("1. 摄像头是否正确连接")
-    print("2. 运行 'rpicam-hello' 测试摄像头是否工作")
-    return None
+    def get(self, prop):
+        """模拟OpenCV的get方法"""
+        if prop == cv2.CAP_PROP_FRAME_WIDTH:
+            return self.width
+        elif prop == cv2.CAP_PROP_FRAME_HEIGHT:
+            return self.height
+        elif prop == cv2.CAP_PROP_FPS:
+            return self.fps
+        return 0
+
+
+def open_camera_pi5():
+    """使用 rpicam-still 为树莓派5打开摄像头"""
+    print("Using rpicam-still for frame capture...")
+    
+    stream = RPiCameraStream(640, 480, 8)  # 8 FPS对于人脸识别足够
+    cap = stream.start_stream()
+    
+    if cap is None:
+        print("ERROR: 无法启动 rpicam 帧捕获")
+        print("请检查:")
+        print("1. 摄像头是否正确连接")
+        print("2. 运行 'rpicam-hello' 测试摄像头是否工作")
+        print("3. 确保安装了 rpicam-apps")
+        return None
+    
+    return cap
 
 
 def open_available_camera(preferred_index=CAMERA_INDEX, max_index=MAX_CAMERA_INDEX):
@@ -156,13 +225,8 @@ def recognize():
         print("Cannot open camera.")
         return
 
-    # 摄像头预热
-    print("Warming up camera...")
-    for i in range(10):
-        ret, _ = video_capture.read()
-        if ret:
-            break
-        time.sleep(0.1)
+    # 摄像头已在启动时预热，无需额外预热
+    print("Camera ready for recognition...")
     
     # Prepare video properties and buffering
     fps = int(video_capture.get(cv2.CAP_PROP_FPS))
