@@ -276,7 +276,7 @@ def recognize():
             rgb_small = small[:, :, ::-1]  # 将 BGR 转为 RGB
 
             locations = face_recognition.face_locations(rgb_small)  # 找到人脸位置
-            encodings = face_recognition.face_encodings(rgb_small, locations)  # 计算人脸特征
+            encodings = face_recognition.face_encodings(rgb_small)  # 计算人脸特征
 
             unknown_present = False
             face_names = []
