@@ -12,7 +12,7 @@ DATASET_DIR = "dataset"
 def capture_faces(num_photos: int = 3) -> None:
     """
     使用 Picamera2 API 进行人脸图像捕获 (树莓派5)
-    带实时预览，按回车拍照
+    直接拍照，无预览窗口
     """
     # 1. 配置并启动摄像头
     picam2 = Picamera2()
@@ -35,12 +35,10 @@ def capture_faces(num_photos: int = 3) -> None:
     
     picam2.start()
 
-    # 2. 启动原生预览（类似 rpicam-hello）
-    picam2.start_preview()
-
     try:
         print("使用 Picamera2 进行图像捕获")
-        print("预览窗口已打开，在终端按回车键拍照，按 Ctrl+C 退出")
+        print("提示：使用 'rpicam-hello' 命令可以查看摄像头预览")
+        print("在终端按回车键拍照，按 Ctrl+C 退出")
 
         while True:
             name = input("请输入姓名（直接回车退出）：").strip()
@@ -82,8 +80,7 @@ def capture_faces(num_photos: int = 3) -> None:
         print("\n捕获已取消，正在退出...")
 
     finally:
-        # 停止预览与摄像头
-        picam2.stop_preview()
+        # 停止摄像头
         picam2.close()
         print("摄像头已关闭")
 
