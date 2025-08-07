@@ -36,8 +36,8 @@ def capture_faces(num_photos: int = 3) -> None:
     picam2.start()
 
     # 2. 启动原生预览（类似 rpicam-hello）
-    preview = Preview(picam2)
-    preview.start()
+    preview = Preview()
+    preview.start(picam2)
 
     try:
         print("使用 Picamera2 进行图像捕获")
