@@ -76,33 +76,9 @@ source venv/bin/activate
 
 ### 5. 安装 Python 库
 
-**方法一：推荐方式（分步安装，避免网络问题）**
-```bash
-pip install --upgrade pip
-
-# 安装基础数值计算库
-pip install numpy
-
-# 安装OpenCV图像处理库
-pip install opencv-python
-
-# 安装树莓派摄像头API
-pip install picamera2
-
-# 安装人脸识别库（较大，最后安装）
-pip install face_recognition
-```
-
-**方法二：一次性安装**
 ```bash
 pip install --upgrade pip
 pip install numpy opencv-python picamera2 face_recognition
-```
-
-**方法三：使用镜像源（网络较慢时）**
-```bash
-pip install -i https://pypi.tuna.tsinghua.edu.cn/simple \
-  numpy opencv-python picamera2 face_recognition
 ```
 
 ---
@@ -236,9 +212,6 @@ dataset/
    
    # 安装系统依赖（包含libcamera Python绑定）
    sudo apt install -y libcamera-apps python3-libcamera
-   
-   # 测试摄像头硬件
-   libcamera-hello --timeout 3000
    ```
 
 2. **安装项目**
@@ -250,7 +223,7 @@ dataset/
    python3 -m venv venv
    source venv/bin/activate
    
-   # 在虚拟环境中安装所有Python依赖
+   # 安装Python依赖
    pip install --upgrade pip
    pip install numpy opencv-python picamera2 face_recognition
    ```
@@ -271,64 +244,36 @@ dataset/
 
 ## 🔧 故障排除
 
-### 安装相关问题：
+### 常见问题：
 
-**问题：pip安装失败或网络超时**
+**pip安装失败**
 ```bash
-# 方案1：使用国内镜像源
+# 网络问题可尝试镜像源
 pip install -i https://pypi.tuna.tsinghua.edu.cn/simple face_recognition
-
-# 方案2：增加超时时间
-pip install --timeout 300 face_recognition
-
-# 方案3：分别安装（逐个解决问题）
-pip install numpy
-pip install opencv-python  
-pip install picamera2
-pip install face_recognition
 ```
 
-**问题：ModuleNotFoundError: No module named 'cv2'**
+**ModuleNotFoundError: No module named 'cv2'**  
 ```bash
-# 确保在虚拟环境中
+# 确保在虚拟环境中，重新安装
 source venv/bin/activate
-
-# 重新安装OpenCV
-pip uninstall opencv-python
 pip install opencv-python
 ```
 
-**问题：import错误或版本冲突**
+**ModuleNotFoundError: No module named 'libcamera'**
 ```bash
-# 清理并重新安装
-pip uninstall opencv-python picamera2 face_recognition
-pip install opencv-python picamera2 face_recognition
+# 安装系统级libcamera绑定
+sudo apt install python3-libcamera
 ```
 
-### 摄像头相关问题：
-
-**问题：摄像头无法打开**
+**摄像头无法打开**
 ```bash
-# 检查摄像头连接
+# 测试摄像头硬件
 libcamera-hello --timeout 3000
-
-# 如果 libcamera-hello 工作，但程序不工作：
-# 检查 Picamera2 安装
-sudo apt install python3-picamera2
-
-# 检查Python环境中的Picamera2
-python3 -c "from picamera2 import Picamera2; print('Picamera2 可用')"
 
 # 检查权限
 sudo usermod -a -G video $USER
 # 重新登录后生效
 ```
-
-**注意**：本项目使用Picamera2 API，如果 `libcamera-hello` 能正常工作，程序就应该能正常运行。
-
-**问题：图像质量差或颜色异常**
-- capture.py 中已优化参数，适合大多数环境
-- 如需调整，可修改摄像头参数：亮度、对比度、白平衡等
 
 **问题：性能较慢**
 ```bash
