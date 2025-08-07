@@ -208,6 +208,7 @@ def recognize():
     实时进行人脸识别的主循环
     """
     known_encodings, known_names = load_known_faces(DATASET_DIR)
+    print(f"加载了 {len(known_encodings)} 个已知人脸编码")
     if not known_encodings:
         print("No known faces loaded. Populate the dataset directory with images.")
 
@@ -275,12 +276,25 @@ def recognize():
             small = cv2.resize(frame, (0, 0), fx=0.25, fy=0.25)  # 缩小图像以加快处理速度
             rgb_small = small[:, :, ::-1]  # 将 BGR 转为 RGB
 
+            # 调试：检查图像数据
+            if frame_count % 30 == 0:  # 每30帧打印一次调试信息
+                print(f"Frame shape: {frame.shape}, small shape: {small.shape}, rgb_small shape: {rgb_small.shape}")
+                print(f"Frame dtype: {frame.dtype}, rgb_small dtype: {rgb_small.dtype}")
+                print(f"Frame range: {frame.min()}-{frame.max()}, rgb_small range: {rgb_small.min()}-{rgb_small.max()}")
+
             locations = face_recognition.face_locations(rgb_small)  # 找到人脸位置
             encodings = face_recognition.face_encodings(rgb_small)  # 计算人脸特征
 
+            # 调试信息
+            if frame_count % 10 == 0:  # 每10帧打印一次检测结果
+                print(f"检测到 {len(locations)} 个人脸位置，{len(encodings)} 个人脸特征")
+
             unknown_present = False
             face_names = []
-            if encodings:
+            
+            # 确保 locations 和 encodings 匹配
+            if locations and encodings:
+                # 只处理有特征的人脸
                 encodings_array = np.array(encodings)
                 if known_encodings:
                     known_array = np.array(known_encodings)
@@ -304,12 +318,15 @@ def recognize():
                     unknown_present = True
 
             # Draw results on the frame
-            for (top, right, bottom, left), name in zip(locations, face_names):
+            for i, (top, right, bottom, left) in enumerate(locations):
                 # 缩放回原始尺寸
                 top *= 4
                 right *= 4
                 bottom *= 4
                 left *= 4
+                
+                # 获取对应的名字（如果有的话）
+                name = face_names[i] if i < len(face_names) else "Unknown"
                 
                 # 设置颜色：已知人员为绿色，未知人员为红色
                 color = (0, 255, 0) if name != "Unknown" else (0, 0, 255)
@@ -336,8 +353,7 @@ def recognize():
 
             # 调试信息
             if frame is not None:
-                print(f"Frame shape: {frame.shape}, dtype: {frame.dtype}")
-                
+
                 # 在帧上添加状态信息
                 status_text = f"FPS: {frame_count / (current_time - start_time):.1f} | Faces: {len(face_names)}"
                 cv2.putText(frame, status_text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
