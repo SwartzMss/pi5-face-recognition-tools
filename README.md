@@ -219,13 +219,13 @@ dataset/
    git clone https://github.com/SwartzMss/pi5-face-recognition-tools.git
    cd pi5-face-recognition-tools
    
-   # 创建虚拟环境
-   python3 -m venv venv
+   # 创建虚拟环境（继承系统包以解决依赖冲突）
+   python3 -m venv venv --system-site-packages
    source venv/bin/activate
    
-   # 安装Python依赖
+   # 安装项目依赖（使用锁定版本避免兼容性问题）
    pip install --upgrade pip
-   pip install numpy opencv-python picamera2 face_recognition
+   pip install -r requirements.txt
    ```
 
 3. **数据采集**
@@ -241,7 +241,6 @@ dataset/
    ```
 
 ---
-
 ## 🔧 故障排除
 
 ### 常见问题：
