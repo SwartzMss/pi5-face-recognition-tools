@@ -44,14 +44,10 @@ sudo apt update && sudo apt upgrade -y
 ### 2. 安装系统依赖
 
 ```bash
-sudo apt install -y \
-  build-essential cmake libopenblas-dev liblapack-dev libjpeg-dev libtiff5-dev \
-  libpng-dev libavcodec-dev libavformat-dev libswscale-dev libv4l-dev \
-  libxvidcore-dev libx264-dev libatlas-base-dev libgtk2.0-dev pkg-config \
-  libhdf5-dev python3-venv libcamera-apps python3-picamera2
+sudo apt install -y build-essential cmake libcamera-apps libcap-dev python3-libcamera
 ```
 
-**重要**：确保安装了 `python3-picamera2`，这是树莓派5官方推荐的摄像头API。
+**说明**：`python3-libcamera` 是Picamera2必需的系统级Python绑定，无法通过pip安装。
 
 ### 3. 编译并安装 dlib（同时启用 NEON 指令集与 OpenMP 并行）
 - #### 说明：NEON 与 OpenMP 可以同时启用。NEON 提供 SIMD 向量化加速，而 OpenMP 利用多核并行，共同提升计算性能。
@@ -80,13 +76,33 @@ source venv/bin/activate
 
 ### 5. 安装 Python 库
 
+**方法一：推荐方式（分步安装，避免网络问题）**
 ```bash
 pip install --upgrade pip
-pip install \
-  face_recognition \
-  opencv-python \
-  numpy \
-  picamera2
+
+# 安装基础数值计算库
+pip install numpy
+
+# 安装OpenCV图像处理库
+pip install opencv-python
+
+# 安装树莓派摄像头API
+pip install picamera2
+
+# 安装人脸识别库（较大，最后安装）
+pip install face_recognition
+```
+
+**方法二：一次性安装**
+```bash
+pip install --upgrade pip
+pip install numpy opencv-python picamera2 face_recognition
+```
+
+**方法三：使用镜像源（网络较慢时）**
+```bash
+pip install -i https://pypi.tuna.tsinghua.edu.cn/simple \
+  numpy opencv-python picamera2 face_recognition
 ```
 
 ---
@@ -218,11 +234,11 @@ dataset/
    # 更新系统
    sudo apt update && sudo apt upgrade -y
    
-   # 安装依赖
-   sudo apt install -y python3-picamera2 libcamera-apps
+   # 安装系统依赖（包含libcamera Python绑定）
+   sudo apt install -y libcamera-apps python3-libcamera
    
-   # 测试摄像头
-   python3 -c "from picamera2 import Picamera2; print('Picamera2 API 可用')"
+   # 测试摄像头硬件
+   libcamera-hello --timeout 3000
    ```
 
 2. **安装项目**
@@ -234,8 +250,9 @@ dataset/
    python3 -m venv venv
    source venv/bin/activate
    
-   # 安装依赖
-   pip install face_recognition opencv-python numpy picamera2
+   # 在虚拟环境中安装所有Python依赖
+   pip install --upgrade pip
+   pip install numpy opencv-python picamera2 face_recognition
    ```
 
 3. **数据采集**
@@ -253,6 +270,40 @@ dataset/
 ---
 
 ## 🔧 故障排除
+
+### 安装相关问题：
+
+**问题：pip安装失败或网络超时**
+```bash
+# 方案1：使用国内镜像源
+pip install -i https://pypi.tuna.tsinghua.edu.cn/simple face_recognition
+
+# 方案2：增加超时时间
+pip install --timeout 300 face_recognition
+
+# 方案3：分别安装（逐个解决问题）
+pip install numpy
+pip install opencv-python  
+pip install picamera2
+pip install face_recognition
+```
+
+**问题：ModuleNotFoundError: No module named 'cv2'**
+```bash
+# 确保在虚拟环境中
+source venv/bin/activate
+
+# 重新安装OpenCV
+pip uninstall opencv-python
+pip install opencv-python
+```
+
+**问题：import错误或版本冲突**
+```bash
+# 清理并重新安装
+pip uninstall opencv-python picamera2 face_recognition
+pip install opencv-python picamera2 face_recognition
+```
 
 ### 摄像头相关问题：
 
