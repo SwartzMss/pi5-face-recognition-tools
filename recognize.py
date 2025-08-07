@@ -306,7 +306,7 @@ def recognize():
                 print(f"Frame range: {frame.min()}-{frame.max()}, rgb range: {rgb.min()}-{rgb.max()}")
 
             locations = face_recognition.face_locations(rgb)  # 找到人脸位置
-            encodings = face_recognition.face_encodings(rgb, locations)  # 计算人脸特征
+            encodings = face_recognition.face_encodings(rgb)  # 计算人脸特征
 
             # 调试信息
             if frame_count % 10 == 0:  # 每10帧打印一次检测结果
@@ -344,12 +344,6 @@ def recognize():
 
             # Draw results on the frame
             for i, (top, right, bottom, left) in enumerate(locations):
-                # 缩放回原始尺寸
-                top *= 4
-                right *= 4
-                bottom *= 4
-                left *= 4
-                
                 # 获取对应的名字（如果有的话）
                 name = face_names[i] if i < len(face_names) else "Unknown"
                 
