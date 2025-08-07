@@ -143,23 +143,46 @@ def load_known_faces(dataset_dir):
     """
     encodings = []
     names = []
-    for person_name in os.listdir(dataset_dir):
+    print(f"开始加载训练数据，目录: {dataset_dir}")
+    
+    if not os.path.exists(dataset_dir):
+        print(f"错误: 数据集目录不存在: {dataset_dir}")
+        return encodings, names
+    
+    person_dirs = [d for d in os.listdir(dataset_dir) if os.path.isdir(os.path.join(dataset_dir, d))]
+    print(f"找到 {len(person_dirs)} 个人员目录: {person_dirs}")
+    
+    for person_name in person_dirs:
         person_dir = os.path.join(dataset_dir, person_name)
-        if not os.path.isdir(person_dir):
-            continue  # 只处理子目录
-        for file_name in os.listdir(person_dir):
-            if not file_name.lower().endswith((".jpg", ".jpeg", ".png")):
-                continue  # 只处理常见的图像文件
+        print(f"处理人员: {person_name}, 目录: {person_dir}")
+        
+        image_files = [f for f in os.listdir(person_dir) if f.lower().endswith((".jpg", ".jpeg", ".png"))]
+        print(f"  找到 {len(image_files)} 张图片: {image_files}")
+        
+        for file_name in image_files:
             file_path = os.path.join(person_dir, file_name)
-            image = face_recognition.load_image_file(file_path)
-            face_encs = face_recognition.face_encodings(image)
-            if len(face_encs) == 1:
-                encodings.append(face_encs[0])  # 只使用检测到的第一张人脸
-                names.append(person_name)  # 目录名作为标签
-            elif len(face_encs) > 1:
-                print(
-                    f"Warning: Multiple faces detected in {file_path}. Skipping this image."
-                )
+            print(f"  处理图片: {file_path}")
+            
+            try:
+                image = face_recognition.load_image_file(file_path)
+                print(f"    图片加载成功，形状: {image.shape}")
+                
+                face_encs = face_recognition.face_encodings(image)
+                print(f"    检测到 {len(face_encs)} 个人脸特征")
+                
+                if len(face_encs) == 1:
+                    encodings.append(face_encs[0])  # 只使用检测到的第一张人脸
+                    names.append(person_name)  # 目录名作为标签
+                    print(f"    ✓ 成功添加 {person_name} 的人脸特征")
+                elif len(face_encs) > 1:
+                    print(f"    ⚠️  警告: 在 {file_path} 中检测到多个人脸，跳过此图片")
+                else:
+                    print(f"    ❌ 错误: 在 {file_path} 中未检测到人脸")
+                    
+            except Exception as e:
+                print(f"    ❌ 处理图片 {file_path} 时出错: {e}")
+    
+    print(f"总共加载了 {len(encodings)} 个人脸编码")
     return encodings, names
 
 
@@ -273,21 +296,23 @@ def recognize():
             # Maintain a rolling buffer of recent frames
             frame_buffer.append(frame.copy())  # 保存最近的帧到缓冲区
 
-            small = cv2.resize(frame, (0, 0), fx=0.25, fy=0.25)  # 缩小图像以加快处理速度
-            rgb_small = small[:, :, ::-1]  # 将 BGR 转为 RGB
+            # 使用原始分辨率进行人脸检测
+            rgb = frame[:, :, ::-1]  # 将 BGR 转为 RGB
 
             # 调试：检查图像数据
             if frame_count % 30 == 0:  # 每30帧打印一次调试信息
-                print(f"Frame shape: {frame.shape}, small shape: {small.shape}, rgb_small shape: {rgb_small.shape}")
-                print(f"Frame dtype: {frame.dtype}, rgb_small dtype: {rgb_small.dtype}")
-                print(f"Frame range: {frame.min()}-{frame.max()}, rgb_small range: {rgb_small.min()}-{rgb_small.max()}")
+                print(f"Frame shape: {frame.shape}, rgb shape: {rgb.shape}")
+                print(f"Frame dtype: {frame.dtype}, rgb dtype: {rgb.dtype}")
+                print(f"Frame range: {frame.min()}-{frame.max()}, rgb range: {rgb.min()}-{rgb.max()}")
 
-            locations = face_recognition.face_locations(rgb_small)  # 找到人脸位置
-            encodings = face_recognition.face_encodings(rgb_small)  # 计算人脸特征
+            locations = face_recognition.face_locations(rgb)  # 找到人脸位置
+            encodings = face_recognition.face_encodings(rgb, locations)  # 计算人脸特征
 
             # 调试信息
             if frame_count % 10 == 0:  # 每10帧打印一次检测结果
                 print(f"检测到 {len(locations)} 个人脸位置，{len(encodings)} 个人脸特征")
+                if locations:
+                    print(f"人脸位置: {locations}")
 
             unknown_present = False
             face_names = []
