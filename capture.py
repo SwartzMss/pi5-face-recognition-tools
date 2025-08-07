@@ -1,154 +1,91 @@
 import os
-import subprocess
+import threading
 import time
+import cv2
+from picamera2 import Picamera2
+from picamera2 import Preview
 
 # 数据集目录
 DATASET_DIR = "dataset"
 
 
-def capture_with_rpicam(output_path: str) -> bool:
-    """
-    使用 rpicam-still 命令捕获图像 (树莓派5)
-    
-    Parameters
-    ----------
-    output_path: str
-        输出图像文件路径
-        
-    Returns
-    -------
-    bool
-        是否成功捕获图像
-    """
-    try:
-        # 使用rpicam-still捕获图像，优化参数
-        cmd = [
-            "rpicam-still", 
-            "-o", output_path,
-            "--width", "640",
-            "--height", "480",
-            "--timeout", "2000",     # 2秒超时
-            "--brightness", "0.3",   # 增加亮度
-            "--contrast", "1.2",     # 增强对比度
-            "--saturation", "1.0",   # 正常饱和度
-            "--awb", "tungsten",     # 钨丝灯白平衡，减少绿色调
-            "--ev", "0.5",           # 增加曝光补偿
-            "--quality", "95",       # 高质量JPEG
-            "--encoding", "jpg"
-        ]
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
-        
-        if result.returncode == 0 and os.path.exists(output_path):
-            return True
-        else:
-            print(f"rpicam-still failed: {result.stderr}")
-            return False
-            
-    except subprocess.TimeoutExpired:
-        print("rpicam-still timeout")
-        return False
-    except FileNotFoundError:
-        print("rpicam-still command not found")
-        return False
-    except Exception as e:
-        print(f"rpicam-still error: {e}")
-        return False
-
-
-
 def capture_faces(num_photos: int = 3) -> None:
     """
-    使用 rpicam-still 命令进行人脸图像捕获 (树莓派5)
+    使用 Picamera2 API 进行人脸图像捕获 (树莓派5)
     带实时预览，按回车拍照
     """
-    print("使用 rpicam-still 进行图像捕获")
-    print("预览窗口将持续显示，在终端按回车键拍照")
-    
+    # 1. 配置并启动摄像头
+    picam2 = Picamera2()
+    config = picam2.create_preview_configuration(
+        main={"size": (640, 480)},    # 主流，用于高质量拍摄
+        lores={"size": (320, 240)}    # 预览流
+    )
+    picam2.configure(config)
+    picam2.start()
+
+    # 2. 启动预览窗口线程
+    running = True
+
+    def preview_loop():
+        window_name = "Camera Preview"
+        cv2.namedWindow(window_name)
+        while running:
+            # 获取 lores 流 RGB 数组
+            rgb = picam2.capture_array("lores")
+            frame = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
+            cv2.imshow(window_name, frame)
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+        cv2.destroyWindow(window_name)
+
+    preview_thread = threading.Thread(target=preview_loop, daemon=True)
+    preview_thread.start()
+
     try:
+        print("使用 Picamera2 进行图像捕获")
+        print("预览窗口已打开，在终端按回车键拍照，按 Ctrl+C 退出")
+
         while True:
             name = input("请输入姓名（直接回车退出）：").strip()
             if not name:
                 break
-                
+
             person_dir = os.path.join(DATASET_DIR, name)
             os.makedirs(person_dir, exist_ok=True)
-            
-            existing = [
+            existing_files = [
                 f for f in os.listdir(person_dir)
                 if f.lower().endswith((".jpg", ".jpeg", ".png"))
             ]
-            
-            # 启动持续预览
-            print(f"正在为 {name} 启动摄像头预览...")
-            print("在终端按回车键拍照，按 Ctrl+C 结束当前人员拍摄")
-            
-            preview_process = None
-            try:
-                # 启动预览进程（后台运行）
-                preview_cmd = [
-                    "rpicam-hello",
-                    "--timeout", "0",        # 持续预览
-                    "--width", "640",
-                    "--height", "480", 
-                    "--brightness", "0.3",
-                    "--contrast", "1.2",
-                    "--saturation", "1.0",
-                    "--awb", "tungsten",
-                    "--ev", "0.5"
-                ]
-                preview_process = subprocess.Popen(preview_cmd, 
-                                                 stdout=subprocess.DEVNULL, 
-                                                 stderr=subprocess.DEVNULL)
-                
-                # 等待预览启动
-                time.sleep(2)
-                print("预览已启动，现在可以开始拍照了！")
-                
-                count = 0
-                while count < num_photos:
-                    input(f"拍摄第 {count + 1}/{num_photos} 张照片 - 按回车键拍摄...")
-                    
-                    # 拍照前停止预览
-                    print("正在拍摄...")
-                    if preview_process:
-                        preview_process.terminate()
-                        preview_process.wait()
-                    
-                    count += 1
-                    idx = len(existing) + count
-                    file_path = os.path.join(person_dir, f"{idx}.jpg")
-                    
-                    # 拍照
-                    if capture_with_rpicam(file_path):
-                        print(f"✓ 已保存 {file_path}")
-                    else:
-                        print("✗ 拍摄失败，请重试")
-                        count -= 1  # 重试这张照片
-                    
-                    # 如果还有照片要拍，重新启动预览
-                    if count < num_photos:
-                        print("重新启动预览...")
-                        preview_process = subprocess.Popen(preview_cmd, 
-                                                         stdout=subprocess.DEVNULL, 
-                                                         stderr=subprocess.DEVNULL)
-                        time.sleep(1)  # 等待预览启动
-                        
-            except KeyboardInterrupt:
-                print(f"\n{name} 拍摄结束")
-            finally:
-                # 结束预览进程
-                if preview_process:
-                    preview_process.terminate()
-                    preview_process.wait()
-                    print("预览已关闭")
-                    
+
+            count = 0
+            while count < num_photos:
+                input(f"[{name}] 拍摄第 {count + 1}/{num_photos} 张 - 按回车键拍照...")
+
+                # 捕获 main 流并保存
+                rgb = picam2.capture_array("main")
+                frame = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
+
+                idx = len(existing_files) + count + 1
+                file_path = os.path.join(person_dir, f"{idx}.jpg")
+                cv2.imwrite(file_path, frame)
+                print(f"✓ 已保存: {file_path}")
+
+                count += 1
+                time.sleep(0.5)  # 给缓冲一点时间
+
             cont = input("是否继续添加其他人? (y/n): ").strip().lower()
             if cont != 'y':
                 break
-                
+
     except KeyboardInterrupt:
-        print("\n拍摄已取消")
-        return
+        print("\n捕获已取消，正在退出...")
+
+    finally:
+        # 停止预览与摄像头
+        running = False
+        preview_thread.join(timeout=2)
+        picam2.close()
+        print("摄像头已关闭")
 
 
 if __name__ == "__main__":

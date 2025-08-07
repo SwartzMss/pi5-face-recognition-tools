@@ -1,8 +1,8 @@
 # Pi5 人脸识别工具
 
-基于 Raspberry Pi 5 的实时人脸检测与识别系统，**完全使用 rpicam 原生命令**，避免所有 OpenCV 后端兼容性问题。本仓库提供完整的解决方案：从数据采集到实时识别，专为树莓派5优化。
+基于 Raspberry Pi 5 的实时人脸检测与识别系统，**使用 OpenCV + libcamera (Picamera2) 方案**，提供稳定可靠的摄像头接口。本仓库提供完整的解决方案：从数据采集到实时识别，专为树莓派5优化。
 
-> 🚨 **重要**：本项目已完全移除对 libcamera/V4L2/OpenCV VideoCapture 的依赖，使用纯 rpicam 方案，确保在树莓派5上100%兼容。
+> ✅ **技术方案**：本项目采用 OpenCV + Picamera2 方案，Picamera2是树莓派官方推荐的新一代摄像头API，基于libcamera架构，在树莓派5上提供最佳性能和兼容性。
 
 ---
 
@@ -11,16 +11,16 @@
 `pi5-face-recognition-tools` 专为 Raspberry Pi 5 设计，实现了完整的人脸识别工作流：
 
 ### 🎯 核心功能
-- **数据采集** (`capture.py`)：使用 rpicam-still 进行高质量人脸图像采集
-- **实时识别** (`recognize.py`)：基于 rpicam-still 的实时人脸检测与识别
+- **数据采集** (`capture.py`)：使用 Picamera2 API 进行高质量人脸图像采集
+- **实时识别** (`recognize.py`)：基于 Picamera2 的实时人脸检测与识别
 - **树莓派5优化**：完美适配 Pi5 的新摄像头架构
 
 ### ✨ 技术特性
-- **纯 rpicam 方案**：完全基于树莓派5原生摄像头命令
-- **零依赖冲突**：不依赖 OpenCV VideoCapture、libcamera 或 V4L2
-- **实时预览**：拍照时提供持续预览功能
-- **多线程流**：后台帧捕获，8FPS 实时人脸识别
-- **完美兼容**：专为树莓派5设计，避免所有后端问题
+- **OpenCV + Picamera2 方案**：结合OpenCV图像处理与Picamera2摄像头API
+- **稳定可靠**：基于官方推荐的libcamera架构
+- **实时预览**：拍照时提供持续预览功能  
+- **多线程流**：后台帧捕获，15FPS 实时人脸识别
+- **完美兼容**：专为树莓派5设计，提供最佳性能
 
 ---
 
@@ -48,10 +48,10 @@ sudo apt install -y \
   build-essential cmake libopenblas-dev liblapack-dev libjpeg-dev libtiff5-dev \
   libpng-dev libavcodec-dev libavformat-dev libswscale-dev libv4l-dev \
   libxvidcore-dev libx264-dev libatlas-base-dev libgtk2.0-dev pkg-config \
-  libhdf5-dev python3-venv libcamera-apps rpicam-apps
+  libhdf5-dev python3-venv libcamera-apps python3-picamera2
 ```
 
-**重要**：确保安装了 `rpicam-apps`，这是树莓派5摄像头的核心组件。
+**重要**：确保安装了 `python3-picamera2`，这是树莓派5官方推荐的摄像头API。
 
 ### 3. 编译并安装 dlib（同时启用 NEON 指令集与 OpenMP 并行）
 - #### 说明：NEON 与 OpenMP 可以同时启用。NEON 提供 SIMD 向量化加速，而 OpenMP 利用多核并行，共同提升计算性能。
@@ -85,7 +85,8 @@ pip install --upgrade pip
 pip install \
   face_recognition \
   opencv-python \
-  numpy
+  numpy \
+  picamera2
 ```
 
 ---
@@ -103,12 +104,12 @@ pip install \
 
 ### 🎥 使用 capture.py 采集人脸数据
 
-`capture.py` 使用树莓派5的 `rpicam-still` 命令进行高质量图像采集，具有以下特性：
+`capture.py` 使用树莓派5的 `Picamera2` API进行高质量图像采集，具有以下特性：
 
-- **实时预览**：持续显示摄像头预览窗口
+- **实时预览**：OpenCV窗口实时显示摄像头画面
 - **即拍即得**：在终端按回车键立即拍照
-- **自动管理**：预览进程自动启停，避免资源冲突
-- **优化参数**：针对Pi5调优的摄像头设置
+- **双流配置**：主流高质量拍摄，预览流实时显示
+- **多线程设计**：预览和拍照分离，性能稳定
 
 #### 使用方法：
 
@@ -120,8 +121,8 @@ python capture.py
 
 1. **设置拍摄数量**：输入每人拍摄的照片数量（默认3张）
 2. **输入姓名**：为要采集的人员输入姓名
-3. **预览启动**：系统自动启动摄像头预览窗口
-4. **拍照操作**：在终端按回车键拍照，预览窗口显示实时画面
+3. **预览启动**：系统自动启动Picamera2预览窗口
+4. **拍照操作**：在终端按回车键拍照，OpenCV窗口显示实时画面
 5. **继续采集**：可以继续为其他人员采集数据
 
 #### 数据存储结构：
@@ -147,11 +148,11 @@ dataset/
 
 #### ✨ 主要特性：
 
-- **纯 rpicam 方案**：使用 rpicam-still 多线程帧捕获
+- **Picamera2 + OpenCV 方案**：使用 Picamera2 API 多线程帧捕获
 - **可视化界面**：绿框显示已知人员，红框显示未知人员  
 - **性能监控**：实时显示 FPS 和检测到的人脸数量
 - **自动记录**：未知人员自动保存图片和视频
-- **零兼容问题**：完全避免 OpenCV 后端冲突
+- **稳定可靠**：基于官方推荐的libcamera架构
 
 #### 使用方法：
 
@@ -196,14 +197,14 @@ dataset/
 
 | 方案 | 兼容性 | 性能 | 稳定性 | 本项目使用 |
 |------|--------|------|--------|------------|
-| **OpenCV + libcamera** | ❌ 经常失败 | 🟡 中等 | ❌ 不稳定 | ❌ 已移除 |
-| **OpenCV + V4L2** | ❌ Pi5不支持 | 🟡 中等 | ❌ 不兼容 | ❌ 已移除 |
-| **纯 rpicam 命令** | ✅ 完美支持 | ✅ 高效 | ✅ 稳定 | ✅ **当前方案** |
+| **OpenCV + V4L2** | ❌ Pi5不支持 | 🟡 中等 | ❌ 不兼容 | ❌ 已弃用 |
+| **纯 rpicam 命令** | ✅ 兼容性好 | 🟡 中等 | 🟡 复杂 | ❌ 已弃用 |
+| **OpenCV + Picamera2** | ✅ 完美支持 | ✅ 高效 | ✅ 稳定 | ✅ **当前方案** |
 
 ### 核心设计
 
-- **capture.py**：使用 `rpicam-still` + 实时预览窗口
-- **recognize.py**：使用 `RPiCameraStream` 类 + `rpicam-still` 多线程帧捕获
+- **capture.py**：使用 `Picamera2` API + OpenCV 实时预览窗口
+- **recognize.py**：使用 `PiCamera2Stream` 类 + Picamera2 多线程帧捕获
 - **接口兼容**：完全模拟 OpenCV VideoCapture 接口，无需修改识别算法
 
 ---
@@ -218,10 +219,10 @@ dataset/
    sudo apt update && sudo apt upgrade -y
    
    # 安装依赖
-   sudo apt install -y rpicam-apps libcamera-apps
+   sudo apt install -y python3-picamera2 libcamera-apps
    
    # 测试摄像头
-   rpicam-hello --timeout 5000
+   python3 -c "from picamera2 import Picamera2; print('Picamera2 API 可用')"
    ```
 
 2. **安装项目**
@@ -234,7 +235,7 @@ dataset/
    source venv/bin/activate
    
    # 安装依赖
-   pip install face_recognition opencv-python numpy
+   pip install face_recognition opencv-python numpy picamera2
    ```
 
 3. **数据采集**
@@ -258,18 +259,21 @@ dataset/
 **问题：摄像头无法打开**
 ```bash
 # 检查摄像头连接
-rpicam-hello --timeout 3000
+libcamera-hello --timeout 3000
 
-# 如果 rpicam-hello 工作，但 recognize.py 不工作：
-# 检查 rpicam-apps 安装
-sudo apt install rpicam-apps
+# 如果 libcamera-hello 工作，但程序不工作：
+# 检查 Picamera2 安装
+sudo apt install python3-picamera2
+
+# 检查Python环境中的Picamera2
+python3 -c "from picamera2 import Picamera2; print('Picamera2 可用')"
 
 # 检查权限
 sudo usermod -a -G video $USER
 # 重新登录后生效
 ```
 
-**注意**：本项目已完全移除对 `/dev/video*` 设备和 V4L2 的依赖。如果 `rpicam-hello` 能正常工作，`recognize.py` 就应该能工作。
+**注意**：本项目使用Picamera2 API，如果 `libcamera-hello` 能正常工作，程序就应该能正常运行。
 
 **问题：图像质量差或颜色异常**
 - capture.py 中已优化参数，适合大多数环境

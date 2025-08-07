@@ -4,9 +4,9 @@ import face_recognition
 import numpy as np
 from collections import deque
 from datetime import datetime
-import subprocess
 import threading
 import time
+from picamera2 import Picamera2
 
 DATASET_DIR = "dataset"  # 数据集目录
 UNKNOWN_IMAGE_DIR = "unknown_images"  # 未知人脸图像保存目录
@@ -17,8 +17,8 @@ UNKNOWN_SAVE_COOLDOWN = 10  # 保存未知人脸的冷却时间，避免重复�
 TOLERANCE = 0.5  # 人脸识别的距离阈值
 
 
-class RPiCameraStream:
-    """使用 rpicam-vid 通过管道实现真正的视频流"""
+class PiCamera2Stream:
+    """使用 Picamera2 API 实现视频流"""
     
     def __init__(self, width=640, height=480, fps=15):
         self.width = width
@@ -26,118 +26,65 @@ class RPiCameraStream:
         self.fps = fps
         self.running = False
         self.latest_frame = None
-        self.rpicam_process = None
+        self.picam2 = None
         self.capture_thread = None
         self.frame_lock = threading.Lock()
         
     def capture_frames(self):
-        """从rpicam-vid管道中持续读取帧"""
-        print("启动rpicam-vid视频流...")
+        """持续从Picamera2捕获帧"""
+        print("启动Picamera2视频流...")
         
         try:
-            # 启动rpicam-vid进程，输出MJPEG到stdout
-            cmd = [
-                "rpicam-vid",
-                "--output", "-",  # 输出到stdout
-                "--width", str(self.width),
-                "--height", str(self.height),
-                "--framerate", str(self.fps),
-                "--timeout", "0",  # 无限运行
-                "--codec", "mjpeg",
-                "--brightness", "0.3",
-                "--contrast", "1.2",
-                "--saturation", "1.0", 
-                "--awb", "tungsten",
-                "--ev", "0.5",
-                "--inline",  # 内联头部
-                "--nopreview"  # 无预览窗口
-            ]
-            
-            self.rpicam_process = subprocess.Popen(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.DEVNULL,
-                bufsize=0
-            )
-            
-            frame_buffer = b""
-            
-            while self.running and self.rpicam_process.poll() is None:
+            while self.running:
                 try:
-                    # 读取数据块
-                    chunk = self.rpicam_process.stdout.read(4096)
-                    if not chunk:
-                        continue
-                        
-                    frame_buffer += chunk
+                    # 捕获RGB数组并转换为BGR（OpenCV格式）
+                    rgb_frame = self.picam2.capture_array()
+                    bgr_frame = cv2.cvtColor(rgb_frame, cv2.COLOR_RGB2BGR)
                     
-                    # 处理MJPEG帧
-                    while True:
-                        # 查找JPEG起始标记 (FF D8)
-                        start_idx = frame_buffer.find(b'\xff\xd8')
-                        if start_idx == -1:
-                            break
-                            
-                        # 查找JPEG结束标记 (FF D9)  
-                        end_idx = frame_buffer.find(b'\xff\xd9', start_idx + 2)
-                        if end_idx == -1:
-                            break
-                            
-                        # 提取完整JPEG帧
-                        jpeg_data = frame_buffer[start_idx:end_idx + 2]
-                        frame_buffer = frame_buffer[end_idx + 2:]
+                    with self.frame_lock:
+                        self.latest_frame = bgr_frame.copy()
                         
-                        # 解码JPEG
-                        try:
-                            nparr = np.frombuffer(jpeg_data, np.uint8)
-                            frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-                            
-                            if frame is not None:
-                                with self.frame_lock:
-                                    self.latest_frame = frame.copy()
-                                # 减少调试输出
-                                if np.random.random() < 0.1:  # 只输出10%的帧信息
-                                    print(f"视频流正常: {frame.shape}")
-                            
-                        except Exception as e:
-                            print(f"JPEG解码错误: {e}")
-                            
+                    # 控制帧率
+                    time.sleep(1.0 / self.fps)
+                    
                 except Exception as e:
-                    print(f"读取视频流错误: {e}")
-                    break
+                    print(f"捕获帧错误: {e}")
+                    time.sleep(0.1)
                     
         except Exception as e:
-            print(f"启动rpicam-vid失败: {e}")
-        finally:
-            if self.rpicam_process:
-                try:
-                    self.rpicam_process.terminate()
-                    self.rpicam_process.wait(timeout=3)
-                except:
-                    try:
-                        self.rpicam_process.kill()
-                    except:
-                        pass
+            print(f"视频流捕获线程错误: {e}")
                 
     def start_stream(self):
         """启动视频流"""
-        print("启动RPiCamera视频流...")
-        self.running = True
-        self.capture_thread = threading.Thread(target=self.capture_frames, daemon=True)
-        self.capture_thread.start()
-        
-        # 等待第一帧
-        print("等待视频流初始化...")
-        for i in range(100):  # 最多等待10秒
-            with self.frame_lock:
-                if self.latest_frame is not None:
-                    print("✓ RPiCamera视频流启动成功")
-                    return self
-            time.sleep(0.1)
+        print("启动Picamera2视频流...")
+        try:
+            self.picam2 = Picamera2()
+            config = self.picam2.create_video_configuration(
+                main={"size": (self.width, self.height), "format": "RGB888"}
+            )
+            self.picam2.configure(config)
+            self.picam2.start()
             
-        print("✗ 视频流启动失败")
-        self.stop_stream()
-        return None
+            self.running = True
+            self.capture_thread = threading.Thread(target=self.capture_frames, daemon=True)
+            self.capture_thread.start()
+            
+            # 等待第一帧
+            print("等待视频流初始化...")
+            for i in range(50):  # 最多等待5秒
+                with self.frame_lock:
+                    if self.latest_frame is not None:
+                        print("✓ Picamera2视频流启动成功")
+                        return self
+                time.sleep(0.1)
+                
+            print("✗ 视频流启动失败")
+            self.stop_stream()
+            return None
+            
+        except Exception as e:
+            print(f"启动Picamera2失败: {e}")
+            return None
     
     def read(self):
         """读取最新帧，模拟OpenCV VideoCapture.read()"""
@@ -148,7 +95,7 @@ class RPiCameraStream:
     
     def isOpened(self):
         """检查流是否打开"""
-        return self.running and (self.rpicam_process is not None)
+        return self.running and (self.picam2 is not None)
     
     def release(self):
         """停止并清理"""
@@ -156,24 +103,21 @@ class RPiCameraStream:
     
     def stop_stream(self):
         """停止视频流"""
-        print("停止RPiCamera视频流...")
+        print("停止Picamera2视频流...")
         self.running = False
-        
-        # 停止rpicam进程
-        if self.rpicam_process:
-            try:
-                self.rpicam_process.terminate()
-                self.rpicam_process.wait(timeout=3)
-            except subprocess.TimeoutExpired:
-                self.rpicam_process.kill()
-                self.rpicam_process.wait()
-            except:
-                pass
-            self.rpicam_process = None
         
         # 等待线程结束
         if self.capture_thread and self.capture_thread.is_alive():
             self.capture_thread.join(timeout=2)
+        
+        # 停止摄像头
+        if self.picam2:
+            try:
+                self.picam2.stop()
+                self.picam2.close()
+            except:
+                pass
+            self.picam2 = None
     
     def get(self, prop):
         """模拟OpenCV的get方法"""
@@ -267,11 +211,11 @@ def recognize():
     if not known_encodings:
         print("No known faces loaded. Populate the dataset directory with images.")
 
-    # 使用RPiCameraStream代替传统VideoCapture
-    video_capture = RPiCameraStream(640, 480, 15)  # 提高到15FPS
+    # 使用PiCamera2Stream代替传统VideoCapture
+    video_capture = PiCamera2Stream(640, 480, 15)  # 提高到15FPS
     cap = video_capture.start_stream()
     if cap is None:
-        print("无法启动RPiCamera视频流")
+        print("无法启动Picamera2视频流")
         return
 
     # 摄像头已在启动时预热，无需额外预热
@@ -280,7 +224,7 @@ def recognize():
     # Prepare video properties and buffering
     fps = int(cap.get(cv2.CAP_PROP_FPS))
     if fps <= 0 or fps > 60:  # 添加FPS上限检查
-        fps = 15  # 使用RPiCameraStream的默认FPS
+        fps = 15  # 使用PiCamera2Stream的默认FPS
         print(f"Using default FPS: {fps}")
     else:
         print(f"Camera FPS: {fps}")
