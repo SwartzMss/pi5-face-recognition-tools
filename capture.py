@@ -16,11 +16,23 @@ def capture_faces(num_photos: int = 3) -> None:
     """
     # 1. 配置并启动摄像头
     picam2 = Picamera2()
+    
+    # 简化的摄像头配置
     config = picam2.create_preview_configuration(
         main={"size": (640, 480)},    # 主流，用于高质量拍摄
         lores={"size": (320, 240)}    # 预览流
     )
     picam2.configure(config)
+    
+    # 设置基本的摄像头参数
+    picam2.set_controls({
+        "AeEnable": True,           # 自动曝光
+        "AwbEnable": True,          # 自动白平衡
+        "Brightness": 0.0,          # 亮度
+        "Contrast": 1.0,            # 对比度
+        "Saturation": 1.0,          # 饱和度
+    })
+    
     picam2.start()
 
     # 2. 启动预览窗口线程
@@ -28,13 +40,19 @@ def capture_faces(num_photos: int = 3) -> None:
 
     def preview_loop():
         window_name = "Camera Preview"
-        cv2.namedWindow(window_name)
+        cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
+        cv2.resizeWindow(window_name, 640, 480)
+        
         while running:
-            # 获取 lores 流 RGB 数组
-            rgb = picam2.capture_array("lores")
-            frame = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
-            cv2.imshow(window_name, frame)
-            if cv2.waitKey(1) & 0xFF == ord('q'):
+            try:
+                # 获取 lores 流 RGB 数组
+                rgb = picam2.capture_array("lores")
+                frame = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
+                cv2.imshow(window_name, frame)
+                if cv2.waitKey(1) & 0xFF == ord('q'):
+                    break
+            except Exception as e:
+                print(f"预览错误: {e}")
                 break
         cv2.destroyWindow(window_name)
 
@@ -61,17 +79,21 @@ def capture_faces(num_photos: int = 3) -> None:
             while count < num_photos:
                 input(f"[{name}] 拍摄第 {count + 1}/{num_photos} 张 - 按回车键拍照...")
 
-                # 捕获 main 流并保存
-                rgb = picam2.capture_array("main")
-                frame = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
+                try:
+                    # 捕获 main 流并保存
+                    rgb = picam2.capture_array("main")
+                    frame = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
 
-                idx = len(existing_files) + count + 1
-                file_path = os.path.join(person_dir, f"{idx}.jpg")
-                cv2.imwrite(file_path, frame)
-                print(f"✓ 已保存: {file_path}")
+                    idx = len(existing_files) + count + 1
+                    file_path = os.path.join(person_dir, f"{idx}.jpg")
+                    cv2.imwrite(file_path, frame)
+                    print(f"✓ 已保存: {file_path}")
 
-                count += 1
-                time.sleep(0.5)  # 给缓冲一点时间
+                    count += 1
+                    time.sleep(0.5)  # 给缓冲一点时间
+                except Exception as e:
+                    print(f"拍照错误: {e}")
+                    continue
 
             cont = input("是否继续添加其他人? (y/n): ").strip().lower()
             if cont != 'y':
