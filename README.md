@@ -44,7 +44,7 @@ sudo apt update && sudo apt upgrade -y
 ### 2. 安装系统依赖
 
 ```bash
-sudo apt install -y build-essential cmake libcamera-apps libcap-dev python3-libcamera
+sudo apt install -y build-essential cmake libcamera-apps libcap-dev python3-libcamera python3-picamera2
 ```
 
 **说明**：`python3-libcamera` 是Picamera2必需的系统级Python绑定，无法通过pip安装。
@@ -210,8 +210,8 @@ dataset/
    # 更新系统
    sudo apt update && sudo apt upgrade -y
    
-   # 安装系统依赖（包含libcamera Python绑定）
-   sudo apt install -y libcamera-apps python3-libcamera
+   # 安装系统依赖（包含libcamera Python绑定和picamera2）
+   sudo apt install -y build-essential cmake libcamera-apps libcap-dev python3-libcamera python3-picamera2
    ```
 
 2. **安装项目**
