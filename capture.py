@@ -35,29 +35,9 @@ def capture_faces(num_photos: int = 3) -> None:
     
     picam2.start()
 
-    # 2. 启动预览窗口线程
-    running = True
-
-    def preview_loop():
-        window_name = "Camera Preview"
-        cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
-        cv2.resizeWindow(window_name, 640, 480)
-        
-        while running:
-            try:
-                # 获取 lores 流 RGB 数组
-                rgb = picam2.capture_array("lores")
-                frame = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
-                cv2.imshow(window_name, frame)
-                if cv2.waitKey(1) & 0xFF == ord('q'):
-                    break
-            except Exception as e:
-                print(f"预览错误: {e}")
-                break
-        cv2.destroyWindow(window_name)
-
-    preview_thread = threading.Thread(target=preview_loop, daemon=True)
-    preview_thread.start()
+    # 2. 启动原生预览（类似 rpicam-hello）
+    preview = Preview(picam2)
+    preview.start()
 
     try:
         print("使用 Picamera2 进行图像捕获")
@@ -104,8 +84,7 @@ def capture_faces(num_photos: int = 3) -> None:
 
     finally:
         # 停止预览与摄像头
-        running = False
-        preview_thread.join(timeout=2)
+        preview.stop()
         picam2.close()
         print("摄像头已关闭")
 
