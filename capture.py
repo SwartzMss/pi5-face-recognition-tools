@@ -56,6 +56,7 @@ def capture_faces(num_photos: int = 3) -> None:
             while count < num_photos:
                 input(f"[{name}] 拍摄第 {count + 1}/{num_photos} 张 - 按回车键拍照...")
 
+                time.sleep(2)
                 try:
                     # 捕获 main 流并保存
                     rgb = picam2.capture_array("main")

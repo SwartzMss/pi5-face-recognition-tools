@@ -18,7 +18,7 @@ TOLERANCE = 0.5  # 人脸识别的距离阈值
 class PiCamera2Stream:
     """使用 Picamera2 API 实现视频流"""
     
-    def __init__(self, width=640, height=480, fps=15):
+    def __init__(self, width=1280, height=720, fps=30):
         self.width = width
         self.height = height
         self.fps = fps
@@ -57,10 +57,40 @@ class PiCamera2Stream:
         print("启动Picamera2视频流...")
         try:
             self.picam2 = Picamera2()
+            
+            # 创建更高质量的配置
             config = self.picam2.create_video_configuration(
-                main={"size": (self.width, self.height), "format": "RGB888"}
+                main={"size": (self.width, self.height), "format": "RGB888"},
+                controls={
+                    "FrameDurationLimits": (33333, 33333),  # 30fps
+                    "AeEnable": True,  # 自动曝光
+                    "AwbEnable": True,  # 自动白平衡
+                    "AeMeteringMode": 0,  # 平均测光
+                    "AeExposureMode": 0,  # 自动曝光模式
+                    "AwbMode": 0,  # 自动白平衡模式
+                    "Brightness": 0.0,  # 亮度
+                    "Contrast": 1.0,  # 对比度
+                    "Saturation": 1.0,  # 饱和度
+                    "Sharpness": 1.0,  # 锐度
+                    "NoiseReductionMode": 1,  # 降噪模式
+                }
             )
             self.picam2.configure(config)
+            
+            # 设置相机参数
+            self.picam2.set_controls({
+                "AeEnable": True,
+                "AwbEnable": True,
+                "AeMeteringMode": 0,
+                "AeExposureMode": 0,
+                "AwbMode": 0,
+                "Brightness": 0.0,
+                "Contrast": 1.0,
+                "Saturation": 1.0,
+                "Sharpness": 1.0,
+                "NoiseReductionMode": 1,
+            })
+            
             self.picam2.start()
             
             self.running = True
@@ -196,6 +226,33 @@ def alert_known(name):
     print("\a", end="")  # 尝试发出蜂鸣声
 
 
+def enhance_image(frame):
+    """增强图像质量
+    
+    应用图像增强技术来改善图像质量
+    """
+    # 转换为LAB颜色空间进行白平衡调整
+    lab = cv2.cvtColor(frame, cv2.COLOR_BGR2LAB)
+    l, a, b = cv2.split(lab)
+    
+    # 对L通道进行CLAHE（对比度限制自适应直方图均衡）
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+    l = clahe.apply(l)
+    
+    # 合并通道
+    lab = cv2.merge([l, a, b])
+    enhanced = cv2.cvtColor(lab, cv2.COLOR_LAB2BGR)
+    
+    # 应用双边滤波来减少噪声同时保持边缘
+    enhanced = cv2.bilateralFilter(enhanced, 9, 75, 75)
+    
+    # 轻微锐化
+    kernel = np.array([[-1,-1,-1], [-1,9,-1], [-1,-1,-1]])
+    enhanced = cv2.filter2D(enhanced, -1, kernel)
+    
+    return enhanced
+
+
 def save_unknown(frame):
     """Save the current frame for an unknown face.
 
@@ -203,8 +260,12 @@ def save_unknown(frame):
     """
     os.makedirs(UNKNOWN_IMAGE_DIR, exist_ok=True)
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    
+    # 增强图像质量
+    enhanced_frame = enhance_image(frame)
+    
     image_path = os.path.join(UNKNOWN_IMAGE_DIR, f"unknown_{ts}.jpg")
-    cv2.imwrite(image_path, frame)  # 保存当前帧
+    cv2.imwrite(image_path, enhanced_frame)  # 保存增强后的帧
     print(f"Unknown person recorded: {image_path}")
 
 
@@ -219,7 +280,7 @@ def recognize():
         print("No known faces loaded. Populate the dataset directory with images.")
 
     # 使用PiCamera2Stream代替传统VideoCapture
-    video_capture = PiCamera2Stream(640, 480, 15)  # 提高到15FPS
+    video_capture = PiCamera2Stream(1280, 720, 30)  # 提高分辨率和帧率
     cap = video_capture.start_stream()
     if cap is None:
         print("无法启动Picamera2视频流")
@@ -275,9 +336,12 @@ def recognize():
 
 
 
-            # 使用原始分辨率进行人脸检测
+            # 增强图像质量
+            enhanced_frame = enhance_image(frame)
+            
+            # 使用增强后的图像进行人脸检测
             # 将 BGR 转为 RGB，并确保连续内存
-            rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            rgb = cv2.cvtColor(enhanced_frame, cv2.COLOR_BGR2RGB)
             rgb = np.ascontiguousarray(rgb)
 
             # 调试：检查图像数据
@@ -330,13 +394,13 @@ def recognize():
                 
                 # 设置颜色：已知人员为绿色，未知人员为红色
                 color = (0, 255, 0) if name != "Unknown" else (0, 0, 255)
-                cv2.rectangle(frame, (left, top), (right, bottom), color, 2)
+                cv2.rectangle(enhanced_frame, (left, top), (right, bottom), color, 2)
                 
                 # 添加标签背景
                 label_size = cv2.getTextSize(name, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)[0]
-                cv2.rectangle(frame, (left, top - 35), (left + label_size[0], top), color, -1)
+                cv2.rectangle(enhanced_frame, (left, top - 35), (left + label_size[0], top), color, -1)
                 cv2.putText(
-                    frame,
+                    enhanced_frame,
                     name,
                     (left, top - 10),
                     cv2.FONT_HERSHEY_SIMPLEX,
@@ -356,12 +420,12 @@ def recognize():
 
                 # 在帧上添加状态信息
                 status_text = f"FPS: {frame_count / (current_time - start_time):.1f} | Faces: {len(face_names)}"
-                cv2.putText(frame, status_text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-                cv2.putText(frame, "Press 'q' to quit", (10, height - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+                cv2.putText(enhanced_frame, status_text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+                cv2.putText(enhanced_frame, "Press 'q' to quit", (10, height - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
 
                 # 尝试显示窗口
                 try:
-                    cv2.imshow("Face Recognition - Pi5", frame)
+                    cv2.imshow("Face Recognition - Pi5", enhanced_frame)
                     key = cv2.waitKey(1) & 0xFF
                     if key == ord('q'):
                         break  # 按 q 键退出
