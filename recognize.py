@@ -258,15 +258,36 @@ def save_unknown(frame):
 
     保存当前帧作为未知人脸的记录
     """
-    os.makedirs(UNKNOWN_IMAGE_DIR, exist_ok=True)
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    # 创建按日期分类的目录结构
+    date_str = datetime.now().strftime("%Y%m%d")
+    time_str = datetime.now().strftime("%H%M%S")
+    
+    # 创建日期目录
+    date_dir = os.path.join(UNKNOWN_IMAGE_DIR, date_str)
+    os.makedirs(date_dir, exist_ok=True)
     
     # 增强图像质量
     enhanced_frame = enhance_image(frame)
     
-    image_path = os.path.join(UNKNOWN_IMAGE_DIR, f"unknown_{ts}.jpg")
+    # 使用时分秒作为文件名
+    image_path = os.path.join(date_dir, f"{time_str}.jpg")
     cv2.imwrite(image_path, enhanced_frame)  # 保存增强后的帧
     print(f"Unknown person recorded: {image_path}")
+
+
+def save_known(frame, name):
+    """Save the current frame for a known person.
+
+    保存当前帧作为已知人脸的记录
+    """
+    # 增强图像质量
+    enhanced_frame = enhance_image(frame)
+    
+    # 使用年月日时分秒作为文件名
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    image_path = os.path.join(UNKNOWN_IMAGE_DIR, f"{name}_{ts}.jpg")
+    cv2.imwrite(image_path, enhanced_frame)  # 保存增强后的帧
+    print(f"Known person recorded: {image_path}")
 
 
 def recognize():
@@ -302,6 +323,7 @@ def recognize():
     print(f"Camera resolution: {width}x{height}")
 
     last_unknown_time = datetime.min
+    last_known_time = datetime.min
     frame_read_failures = 0
     max_failures = 5
     
@@ -360,7 +382,9 @@ def recognize():
                     print(f"人脸位置: {locations}")
 
             unknown_present = False
+            known_present = False
             face_names = []
+            known_names_detected = []
             
             # 确保 locations 和 encodings 匹配
             if locations and encodings:
@@ -379,6 +403,8 @@ def recognize():
                         if distance <= TOLERANCE:
                             name = known_names[best_match_indices[i]]
                             alert_known(name)
+                            known_present = True
+                            known_names_detected.append(name)
                         else:
                             name = "Unknown"
                             unknown_present = True
@@ -414,6 +440,14 @@ def recognize():
                 if (now - last_unknown_time).total_seconds() > UNKNOWN_SAVE_COOLDOWN:
                     save_unknown(frame)
                     last_unknown_time = now  # 更新上次记录时间
+            
+            # 保存已知人脸的记录
+            if known_present:
+                now = datetime.now()
+                if (now - last_known_time).total_seconds() > UNKNOWN_SAVE_COOLDOWN:
+                    # 保存第一个检测到的已知人脸
+                    save_known(frame, known_names_detected[0])
+                    last_known_time = now  # 更新上次记录时间
 
             # 调试信息
             if frame is not None:
