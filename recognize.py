@@ -73,9 +73,6 @@ class PiCamera2Stream:
                     "Saturation": 1.3,  # 饱和度增强
                     "Sharpness": 1.5,  # 锐度增强
                     "NoiseReductionMode": 1,  # 降噪模式
-                    "AeExposureCompensation": 0.0,  # 曝光补偿
-                    "AeExposureTime": 10000,  # 曝光时间（微秒）
-                    "AeAnalogueGain": 1.0,  # 模拟增益
                 }
             )
             self.picam2.configure(config)
@@ -92,9 +89,6 @@ class PiCamera2Stream:
                 "Saturation": 1.3,
                 "Sharpness": 1.5,
                 "NoiseReductionMode": 1,
-                "AeExposureCompensation": 0.0,
-                "AeExposureTime": 10000,
-                "AeAnalogueGain": 1.0,
             })
             
             self.picam2.start()
