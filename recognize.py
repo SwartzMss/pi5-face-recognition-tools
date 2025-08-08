@@ -226,53 +226,7 @@ def alert_known(name):
     print("\a", end="")  # 尝试发出蜂鸣声
 
 
-def enhance_image(frame):
-    """增强图像质量
-    
-    应用图像增强技术来改善图像质量
-    """
-    # 1. 颜色校正 - 解决绿蓝色偏问题
-    # 转换为LAB颜色空间
-    lab = cv2.cvtColor(frame, cv2.COLOR_BGR2LAB)
-    l, a, b = cv2.split(lab)
-    
-    # 对a和b通道进行白平衡校正
-    a_mean = np.mean(a)
-    b_mean = np.mean(b)
-    a = cv2.add(a, 128 - a_mean)
-    b = cv2.add(b, 128 - b_mean)
-    
-    # 对L通道进行CLAHE（对比度限制自适应直方图均衡）
-    clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8,8))
-    l = clahe.apply(l)
-    
-    # 合并通道并转换回BGR
-    lab = cv2.merge([l, a, b])
-    enhanced = cv2.cvtColor(lab, cv2.COLOR_LAB2BGR)
-    
-    # 2. 颜色饱和度增强
-    hsv = cv2.cvtColor(enhanced, cv2.COLOR_BGR2HSV)
-    hsv[:, :, 1] = cv2.multiply(hsv[:, :, 1], 1.2)  # 增加饱和度
-    enhanced = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
-    
-    # 3. 降噪处理
-    # 使用非局部均值去噪
-    enhanced = cv2.fastNlMeansDenoisingColored(enhanced, None, 10, 10, 7, 21)
-    
-    # 4. 锐化处理 - 增强边缘细节
-    kernel_sharpen = np.array([[-1,-1,-1], [-1,9,-1], [-1,-1,-1]])
-    enhanced = cv2.filter2D(enhanced, -1, kernel_sharpen)
-    
-    # 5. 对比度增强
-    # 转换为YUV颜色空间进行亮度调整
-    yuv = cv2.cvtColor(enhanced, cv2.COLOR_BGR2YUV)
-    yuv[:, :, 0] = cv2.equalizeHist(yuv[:, :, 0])  # 对Y通道进行直方图均衡
-    enhanced = cv2.cvtColor(yuv, cv2.COLOR_YUV2BGR)
-    
-    # 6. 最终的双边滤波 - 保持边缘的同时平滑
-    enhanced = cv2.bilateralFilter(enhanced, 15, 80, 80)
-    
-    return enhanced
+
 
 
 def save_unknown(frame):
@@ -288,8 +242,8 @@ def save_unknown(frame):
     date_dir = os.path.join(UNKNOWN_IMAGE_DIR, date_str)
     os.makedirs(date_dir, exist_ok=True)
     
-    # 增强图像质量
-    enhanced_frame = enhance_image(frame)
+    # 直接使用原始图像，不进行增强
+    enhanced_frame = frame
     
     # 使用时分秒作为文件名
     image_path = os.path.join(date_dir, f"{time_str}.jpg")
@@ -302,8 +256,8 @@ def save_known(frame, name):
 
     保存当前帧作为已知人脸的记录
     """
-    # 增强图像质量
-    enhanced_frame = enhance_image(frame)
+    # 直接使用原始图像，不进行增强
+    enhanced_frame = frame
     
     # 使用年月日时分秒作为文件名
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -380,8 +334,8 @@ def recognize():
 
 
 
-            # 增强图像质量
-            enhanced_frame = enhance_image(frame)
+            # 直接使用原始图像，不进行增强
+            enhanced_frame = frame
             
             # 使用增强后的图像进行人脸检测
             # 将 BGR 转为 RGB，并确保连续内存
