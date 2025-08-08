@@ -166,7 +166,10 @@ def load_known_faces(dataset_dir):
             try:
                 image = face_recognition.load_image_file(file_path)
                 print(f"    图片加载成功，形状: {image.shape}")
-                
+
+                # 确保图像为连续内存，避免 dlib 接口报错
+                image = np.ascontiguousarray(image)
+
                 face_encs = face_recognition.face_encodings(image)
                 print(f"    检测到 {len(face_encs)} 个人脸特征")
                 
@@ -297,7 +300,9 @@ def recognize():
             frame_buffer.append(frame.copy())  # 保存最近的帧到缓冲区
 
             # 使用原始分辨率进行人脸检测
-            rgb = frame[:, :, ::-1]  # 将 BGR 转为 RGB
+            # 将 BGR 转为 RGB，并确保连续内存
+            rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            rgb = np.ascontiguousarray(rgb)
 
             # 调试：检查图像数据
             if frame_count % 30 == 0:  # 每30帧打印一次调试信息
