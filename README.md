@@ -78,7 +78,7 @@ source venv/bin/activate
 
 ```bash
 pip install --upgrade pip
-pip install numpy opencv-python picamera2 face_recognition
+pip install -r requirements.txt
 ```
 
 ---
