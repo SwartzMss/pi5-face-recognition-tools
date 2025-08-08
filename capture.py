@@ -67,10 +67,10 @@ def capture_faces(num_photos: int = 3) -> None:
     # 1. 配置并启动摄像头
     picam2 = Picamera2()
     
-    # 创建更高质量的配置
+    # 创建配置 - 使用更合适的分辨率
     config = picam2.create_preview_configuration(
-        main={"size": (1280, 720)},    # 主流，用于高质量拍摄
-        lores={"size": (640, 480)}     # 预览流
+        main={"size": (640, 480)},     # 主流，使用标准分辨率
+        lores={"size": (320, 240)}     # 预览流
     )
     picam2.configure(config)
     

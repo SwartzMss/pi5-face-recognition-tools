@@ -18,7 +18,7 @@ TOLERANCE = 0.5  # 人脸识别的距离阈值
 class PiCamera2Stream:
     """使用 Picamera2 API 实现视频流"""
     
-    def __init__(self, width=1280, height=720, fps=30):
+    def __init__(self, width=640, height=480, fps=30):
         self.width = width
         self.height = height
         self.fps = fps
@@ -323,7 +323,7 @@ def recognize():
         print("No known faces loaded. Populate the dataset directory with images.")
 
     # 使用PiCamera2Stream代替传统VideoCapture
-    video_capture = PiCamera2Stream(1280, 720, 30)  # 提高分辨率和帧率
+    video_capture = PiCamera2Stream(640, 480, 30)  # 使用标准分辨率
     cap = video_capture.start_stream()
     if cap is None:
         print("无法启动Picamera2视频流")
