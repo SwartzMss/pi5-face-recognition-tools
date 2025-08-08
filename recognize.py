@@ -2,7 +2,7 @@ import os
 import cv2
 import face_recognition
 import numpy as np
-from collections import deque
+
 from datetime import datetime
 import threading
 import time
@@ -10,8 +10,6 @@ from picamera2 import Picamera2
 
 DATASET_DIR = "dataset"  # 数据集目录
 UNKNOWN_IMAGE_DIR = "unknown_images"  # 未知人脸图像保存目录
-UNKNOWN_VIDEO_DIR = "unknown_videos"  # 未知人脸视频保存目录
-VIDEO_CLIP_SECONDS = 3  # 每次录制视频的秒数
 # Cooldown between unknown recordings to avoid duplicates
 UNKNOWN_SAVE_COOLDOWN = 10  # 保存未知人脸的冷却时间，避免重复记录
 TOLERANCE = 0.5  # 人脸识别的距离阈值
@@ -198,34 +196,16 @@ def alert_known(name):
     print("\a", end="")  # 尝试发出蜂鸣声
 
 
-def save_unknown(frames, video_capture, fps, frame_size):
-    """Save buffered frames and additional footage for an unknown face.
+def save_unknown(frame):
+    """Save the current frame for an unknown face.
 
-    将缓冲中的帧以及额外录制的帧保存下来，用于记录未知人脸
+    保存当前帧作为未知人脸的记录
     """
     os.makedirs(UNKNOWN_IMAGE_DIR, exist_ok=True)
-    os.makedirs(UNKNOWN_VIDEO_DIR, exist_ok=True)
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     image_path = os.path.join(UNKNOWN_IMAGE_DIR, f"unknown_{ts}.jpg")
-    cv2.imwrite(image_path, frames[-1])  # 保存触发时刻的最后一帧
-
-    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-    video_path = os.path.join(UNKNOWN_VIDEO_DIR, f"unknown_{ts}.mp4")
-    writer = cv2.VideoWriter(video_path, fourcc, fps, frame_size)
-
-    # Write pre-trigger frames from the buffer
-    for buf_frame in frames:
-        writer.write(buf_frame)  # 写入触发前的缓存帧
-
-    # Record additional frames after trigger
-    for _ in range(int(fps * VIDEO_CLIP_SECONDS)):
-        ret, clip_frame = video_capture.read()
-        if not ret:
-            break
-        writer.write(clip_frame)  # 继续写入触发后的画面
-
-    writer.release()
-    print(f"Unknown person recorded: {image_path}, {video_path}")
+    cv2.imwrite(image_path, frame)  # 保存当前帧
+    print(f"Unknown person recorded: {image_path}")
 
 
 def recognize():
@@ -248,7 +228,7 @@ def recognize():
     # 摄像头已在启动时预热，无需额外预热
     print("Camera ready for recognition...")
     
-    # Prepare video properties and buffering
+    # Prepare video properties
     fps = int(cap.get(cv2.CAP_PROP_FPS))
     if fps <= 0 or fps > 60:  # 添加FPS上限检查
         fps = 15  # 使用PiCamera2Stream的默认FPS
@@ -259,9 +239,6 @@ def recognize():
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     print(f"Camera resolution: {width}x{height}")
-    
-    frame_size = (width, height)
-    frame_buffer = deque(maxlen=int(fps * VIDEO_CLIP_SECONDS))
 
     last_unknown_time = datetime.min
     frame_read_failures = 0
@@ -296,8 +273,7 @@ def recognize():
                 print(f"Processing FPS: {actual_fps:.1f}")
                 last_fps_time = current_time
 
-            # Maintain a rolling buffer of recent frames
-            frame_buffer.append(frame.copy())  # 保存最近的帧到缓冲区
+
 
             # 使用原始分辨率进行人脸检测
             # 将 BGR 转为 RGB，并确保连续内存
@@ -372,7 +348,7 @@ def recognize():
             if unknown_present:
                 now = datetime.now()
                 if (now - last_unknown_time).total_seconds() > UNKNOWN_SAVE_COOLDOWN:
-                    save_unknown(list(frame_buffer), video_capture, fps, frame_size)
+                    save_unknown(frame)
                     last_unknown_time = now  # 更新上次记录时间
 
             # 调试信息
