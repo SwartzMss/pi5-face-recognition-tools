@@ -15,24 +15,46 @@ def enhance_image(frame):
     
     应用图像增强技术来改善图像质量
     """
-    # 转换为LAB颜色空间进行白平衡调整
+    # 1. 颜色校正 - 解决绿蓝色偏问题
+    # 转换为LAB颜色空间
     lab = cv2.cvtColor(frame, cv2.COLOR_BGR2LAB)
     l, a, b = cv2.split(lab)
     
+    # 对a和b通道进行白平衡校正
+    a_mean = np.mean(a)
+    b_mean = np.mean(b)
+    a = cv2.add(a, 128 - a_mean)
+    b = cv2.add(b, 128 - b_mean)
+    
     # 对L通道进行CLAHE（对比度限制自适应直方图均衡）
-    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+    clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8,8))
     l = clahe.apply(l)
     
-    # 合并通道
+    # 合并通道并转换回BGR
     lab = cv2.merge([l, a, b])
     enhanced = cv2.cvtColor(lab, cv2.COLOR_LAB2BGR)
     
-    # 应用双边滤波来减少噪声同时保持边缘
-    enhanced = cv2.bilateralFilter(enhanced, 9, 75, 75)
+    # 2. 颜色饱和度增强
+    hsv = cv2.cvtColor(enhanced, cv2.COLOR_BGR2HSV)
+    hsv[:, :, 1] = cv2.multiply(hsv[:, :, 1], 1.2)  # 增加饱和度
+    enhanced = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
     
-    # 轻微锐化
-    kernel = np.array([[-1,-1,-1], [-1,9,-1], [-1,-1,-1]])
-    enhanced = cv2.filter2D(enhanced, -1, kernel)
+    # 3. 降噪处理
+    # 使用非局部均值去噪
+    enhanced = cv2.fastNlMeansDenoisingColored(enhanced, None, 10, 10, 7, 21)
+    
+    # 4. 锐化处理 - 增强边缘细节
+    kernel_sharpen = np.array([[-1,-1,-1], [-1,9,-1], [-1,-1,-1]])
+    enhanced = cv2.filter2D(enhanced, -1, kernel_sharpen)
+    
+    # 5. 对比度增强
+    # 转换为YUV颜色空间进行亮度调整
+    yuv = cv2.cvtColor(enhanced, cv2.COLOR_BGR2YUV)
+    yuv[:, :, 0] = cv2.equalizeHist(yuv[:, :, 0])  # 对Y通道进行直方图均衡
+    enhanced = cv2.cvtColor(yuv, cv2.COLOR_YUV2BGR)
+    
+    # 6. 最终的双边滤波 - 保持边缘的同时平滑
+    enhanced = cv2.bilateralFilter(enhanced, 15, 80, 80)
     
     return enhanced
 
@@ -60,10 +82,13 @@ def capture_faces(num_photos: int = 3) -> None:
         "AeExposureMode": 0,        # 自动曝光模式
         "AwbMode": 0,               # 自动白平衡模式
         "Brightness": 0.0,          # 亮度
-        "Contrast": 1.0,            # 对比度
-        "Saturation": 1.0,          # 饱和度
-        "Sharpness": 1.0,           # 锐度
+        "Contrast": 1.2,            # 对比度增强
+        "Saturation": 1.3,          # 饱和度增强
+        "Sharpness": 1.5,           # 锐度增强
         "NoiseReductionMode": 1,    # 降噪模式
+        "AeExposureCompensation": 0.0,  # 曝光补偿
+        "AeExposureTime": 10000,    # 曝光时间（微秒）
+        "AeAnalogueGain": 1.0,      # 模拟增益
     })
     
     picam2.start()
