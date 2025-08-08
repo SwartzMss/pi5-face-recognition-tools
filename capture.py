@@ -117,12 +117,12 @@ def capture_faces(num_photos: int = 3) -> None:
                     rgb = picam2.capture_array("main")
                     frame = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
                     
-                    # 增强图像质量
-                    enhanced_frame = enhance_image(frame)
+                    # 暂时关闭图像增强，直接保存原始图像
+                    # enhanced_frame = enhance_image(frame)
 
                     idx = len(existing_files) + count + 1
                     file_path = os.path.join(person_dir, f"{idx}.jpg")
-                    cv2.imwrite(file_path, enhanced_frame)
+                    cv2.imwrite(file_path, frame)
                     print(f"✓ 已保存: {file_path}")
 
                     count += 1
