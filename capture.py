@@ -2,11 +2,39 @@ import os
 import threading
 import time
 import cv2
+import numpy as np
 from picamera2 import Picamera2
 from picamera2 import Preview
 
 # 数据集目录
 DATASET_DIR = "dataset"
+
+
+def enhance_image(frame):
+    """增强图像质量
+    
+    应用图像增强技术来改善图像质量
+    """
+    # 转换为LAB颜色空间进行白平衡调整
+    lab = cv2.cvtColor(frame, cv2.COLOR_BGR2LAB)
+    l, a, b = cv2.split(lab)
+    
+    # 对L通道进行CLAHE（对比度限制自适应直方图均衡）
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+    l = clahe.apply(l)
+    
+    # 合并通道
+    lab = cv2.merge([l, a, b])
+    enhanced = cv2.cvtColor(lab, cv2.COLOR_LAB2BGR)
+    
+    # 应用双边滤波来减少噪声同时保持边缘
+    enhanced = cv2.bilateralFilter(enhanced, 9, 75, 75)
+    
+    # 轻微锐化
+    kernel = np.array([[-1,-1,-1], [-1,9,-1], [-1,-1,-1]])
+    enhanced = cv2.filter2D(enhanced, -1, kernel)
+    
+    return enhanced
 
 
 def capture_faces(num_photos: int = 3) -> None:
@@ -17,20 +45,25 @@ def capture_faces(num_photos: int = 3) -> None:
     # 1. 配置并启动摄像头
     picam2 = Picamera2()
     
-    # 简化的摄像头配置
+    # 创建更高质量的配置
     config = picam2.create_preview_configuration(
-        main={"size": (640, 480)},    # 主流，用于高质量拍摄
-        lores={"size": (320, 240)}    # 预览流
+        main={"size": (1280, 720)},    # 主流，用于高质量拍摄
+        lores={"size": (640, 480)}     # 预览流
     )
     picam2.configure(config)
     
-    # 设置基本的摄像头参数
+    # 设置优化的摄像头参数
     picam2.set_controls({
         "AeEnable": True,           # 自动曝光
         "AwbEnable": True,          # 自动白平衡
+        "AeMeteringMode": 0,        # 平均测光
+        "AeExposureMode": 0,        # 自动曝光模式
+        "AwbMode": 0,               # 自动白平衡模式
         "Brightness": 0.0,          # 亮度
         "Contrast": 1.0,            # 对比度
         "Saturation": 1.0,          # 饱和度
+        "Sharpness": 1.0,           # 锐度
+        "NoiseReductionMode": 1,    # 降噪模式
     })
     
     picam2.start()
@@ -61,10 +94,13 @@ def capture_faces(num_photos: int = 3) -> None:
                     # 捕获 main 流并保存
                     rgb = picam2.capture_array("main")
                     frame = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
+                    
+                    # 增强图像质量
+                    enhanced_frame = enhance_image(frame)
 
                     idx = len(existing_files) + count + 1
                     file_path = os.path.join(person_dir, f"{idx}.jpg")
-                    cv2.imwrite(file_path, frame)
+                    cv2.imwrite(file_path, enhanced_frame)
                     print(f"✓ 已保存: {file_path}")
 
                     count += 1
