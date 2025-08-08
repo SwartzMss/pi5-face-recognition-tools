@@ -67,27 +67,27 @@ class PiCamera2Stream:
                     "AwbEnable": True,  # 自动白平衡
                     "AeMeteringMode": 0,  # 平均测光
                     "AeExposureMode": 0,  # 自动曝光模式
-                    "AwbMode": 0,  # 自动白平衡模式
+                    "AwbMode": 1,  # 日光白平衡模式 (解决绿色偏色)
                     "Brightness": 0.0,  # 亮度
-                    "Contrast": 1.2,  # 对比度增强
-                    "Saturation": 1.3,  # 饱和度增强
-                    "Sharpness": 1.5,  # 锐度增强
+                    "Contrast": 1.0,  # 对比度 (降低)
+                    "Saturation": 1.0,  # 饱和度 (降低)
+                    "Sharpness": 1.0,  # 锐度 (降低)
                     "NoiseReductionMode": 1,  # 降噪模式
                 }
             )
             self.picam2.configure(config)
             
-            # 设置相机参数
+            # 设置相机参数 - 重点解决绿色偏色
             self.picam2.set_controls({
                 "AeEnable": True,
                 "AwbEnable": True,
                 "AeMeteringMode": 0,
                 "AeExposureMode": 0,
-                "AwbMode": 0,
+                "AwbMode": 1,               # 日光白平衡模式 (解决绿色偏色)
                 "Brightness": 0.0,
-                "Contrast": 1.2,
-                "Saturation": 1.3,
-                "Sharpness": 1.5,
+                "Contrast": 1.0,            # 对比度 (降低)
+                "Saturation": 1.0,          # 饱和度 (降低)
+                "Sharpness": 1.0,           # 锐度 (降低)
                 "NoiseReductionMode": 1,
             })
             
